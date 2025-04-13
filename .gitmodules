@@ -1,0 +1,3 @@
+[submodule "nvrhi"]
+	path = nvrhi
+	url = https://github.com/NVIDIA-RTX/NVRHI.git
