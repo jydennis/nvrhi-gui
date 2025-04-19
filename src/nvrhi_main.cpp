@@ -22,6 +22,8 @@ static const Vertex g_Vertices[3]  {
     // and so on...
 };
 
+int bagacounter = 0;
+
 nvrhi::TextureHandle swapChainTexture = NULL;
 ID3D11Device* g_pd3dDevice = NULL;
 ID3D11DeviceContext* g_pImmediateContext = NULL;
@@ -31,7 +33,11 @@ nvrhi::DeviceHandle nvrhiDevice=NULL;
 nvrhi::CommandListHandle commandList = NULL;
 nvrhi::GraphicsPipelineHandle graphicsPipeline =NULL;
 nvrhi::FramebufferHandle framebuffer=NULL;
+nvrhi::InputLayoutHandle inputLayout = NULL;
 
+
+nvrhi::ShaderHandle ptrvertexShader = nullptr;
+nvrhi::ShaderHandle ptrpixelShader = nullptr;
 
 struct MessageCallback : public nvrhi::IMessageCallback
 {
@@ -68,8 +74,113 @@ private:
 };
 
 
+HRESULT CreateShaderFromStrint(nvrhi::ShaderHandle& ptrvertexShader,nvrhi::ShaderHandle& ptrpixelShader, std::string g_PixelShader)
+{
+    HRESULT hr = S_OK;
+    // Assume the shaders are included as C headers; they could just as well be loaded from files.
+    auto g_VertexShader = std::string("struct VSInput\
+        {\
+            float3 position: POSITION;\
+            float3 color: COLOR;\
+        };\
+        struct VSOutput\
+        {\
+            float4 position: SV_POSITION;\
+            float3 color: COLOR;\
+        };\
+        VSOutput Main(VSInput input)\
+        {\
+            VSOutput output = (VSOutput)0;\
+            output.position = float4(input.position, 1.0);\
+            output.color = input.color;\
+            return output;\
+        }\0");
+    // auto g_PixelShader = std::string("struct PSInput\
+    // {\
+    //     float4 position: SV_POSITION;\
+    //     float3 color: COLOR;\
+    // };\
+    // struct PSOutput\
+    // {\
+    //     float4 color: SV_TARGET;\
+    // };\
+    // PSOutput Main(PSInput input)\
+    // {\
+    //     PSOutput output = (PSOutput)0;\
+    //     output.color = float4(input.color, 1.0);\
+    //     return output;\
+    // }\0");
+
+    const D3D_SHADER_MACRO defines[] = 
+    {
+        "EXAMPLE_DEFINE", "1",
+        NULL, NULL
+    };
+
+    UINT flags = D3DCOMPILE_ENABLE_STRICTNESS;
+    ID3DBlob* vshaderBlob = nullptr;
+    ID3DBlob* pshaderBlob = nullptr;
+    ID3DBlob* errorBlob1 = nullptr;
+    ID3DBlob* errorBlob2 = nullptr;
+    hr = D3DCompile( g_VertexShader.c_str(), g_VertexShader.length(), nullptr, nullptr, nullptr,
+                                    "Main", "vs_5_0",
+                                    flags, 0, &vshaderBlob, &errorBlob1 );
+    if ( FAILED(hr) )
+    {
+        if ( errorBlob1 )
+        {
+            std::cerr << "here1";
+            OutputDebugStringA( (char*)errorBlob1->GetBufferPointer() );
+            errorBlob1->Release();
+        }
+
+        if ( vshaderBlob )
+        vshaderBlob->Release();
+
+        return hr;
+    }    
+
+    hr = D3DCompile( g_PixelShader.c_str(), g_PixelShader.length(), nullptr,nullptr, nullptr,
+                                    "Main", "ps_5_0",
+                                    flags, 0, &pshaderBlob, &errorBlob2 );
+
+    if ( FAILED(hr) )
+    {
+        if ( errorBlob2 )
+        {
+            std::cerr << "here2";
+            OutputDebugStringA( (char*)errorBlob2->GetBufferPointer() );
+            errorBlob2->Release();
+        }
+
+        if ( pshaderBlob )
+        pshaderBlob->Release();
+
+        return hr;
+    } 
+    nvrhi::ShaderDesc vsshaderDesc;
+        vsshaderDesc.shaderType = nvrhi::ShaderType::Vertex;
+        vsshaderDesc.debugName = "vertex";
+        vsshaderDesc.entryName = "Main";
+     ptrvertexShader = nvrhiDevice->createShader(
+    vsshaderDesc,
+        vshaderBlob->GetBufferPointer(), vshaderBlob->GetBufferSize());
+
+    nvrhi::ShaderDesc psshaderDesc;
+        psshaderDesc.shaderType = nvrhi::ShaderType::Pixel;
+        psshaderDesc.debugName = "pixel";
+        psshaderDesc.entryName = "Main";
+    ptrpixelShader = nvrhiDevice->createShader(
+    psshaderDesc,
+    pshaderBlob->GetBufferPointer(), pshaderBlob->GetBufferSize());
+
+    return hr;
+}
+
 HRESULT InitD3D(HWND OutputWindow)
 {
+    bagacounter = 0;
+
     HRESULT hr = S_OK;
 
     D3D_FEATURE_LEVEL featureLevels[] =
@@ -146,105 +257,22 @@ HRESULT InitD3D(HWND OutputWindow)
     // In this line, <type> depends on the GAPI and should be one of: D3D11_Resource, D3D12_Resource, VK_Image.
     swapChainTexture = nvrhiDevice->createHandleForNativeTexture(nvrhi::ObjectTypes::D3D11_Resource, static_cast<ID3D11Resource*>(pBackBuffer.Get()), textureDesc);
 
-
-    // hr = g_pd3dDevice->CreateRenderTargetView(pBackBuffer, NULL, &g_pRenderTargetView);
-    // //pBackBuffer->Release();
-    // if(FAILED(hr))
-    // {
-    //     return hr;
-    // }
-
-    // g_pImmediateContext->OMSetRenderTargets(1, &g_pRenderTargetView, NULL);
-
-
-    // Assume the shaders are included as C headers; they could just as well be loaded from files.
-    auto g_VertexShader = std::string("struct VSInput\
-            {\
-                float3 position: POSITION;\
-                float3 color: COLOR;\
-            };\
-            struct VSOutput\
-            {\
-                float4 position: SV_POSITION;\
-                float3 color: COLOR;\
-            };\
-            VSOutput Main(VSInput input)\
-            {\
-                VSOutput output = (VSOutput)0;\
-                output.position = float4(input.position, 1.0);\
-                output.color = input.color;\
-                return output;\
-            }\0");
     auto g_PixelShader = std::string("struct PSInput\
-    {\
-        float4 position: SV_POSITION;\
-        float3 color: COLOR;\
-    };\
-    struct PSOutput\
-    {\
-        float4 color: SV_TARGET;\
-    };\
-    PSOutput Main(PSInput input)\
-    {\
-        PSOutput output = (PSOutput)0;\
-        output.color = float4(input.color, 1.0);\
-        return output;\
-    }\0");
-
-     const D3D_SHADER_MACRO defines[] = 
-    {
-        "EXAMPLE_DEFINE", "1",
-        NULL, NULL
-    };
-
-    UINT flags = D3DCOMPILE_ENABLE_STRICTNESS;
-    ID3DBlob* vshaderBlob = nullptr;
-    ID3DBlob* pshaderBlob = nullptr;
-    ID3DBlob* errorBlob1 = nullptr;
-    ID3DBlob* errorBlob2 = nullptr;
-    hr = D3DCompile( g_VertexShader.c_str(), g_VertexShader.length(), nullptr, nullptr, nullptr,
-                                     "Main", "vs_5_0",
-                                     flags, 0, &vshaderBlob, &errorBlob1 );
-    if ( FAILED(hr) )
-    {
-        if ( errorBlob1 )
-        {
-            std::cerr << "here1";
-            OutputDebugStringA( (char*)errorBlob1->GetBufferPointer() );
-            errorBlob1->Release();
-        }
-
-        if ( vshaderBlob )
-           vshaderBlob->Release();
-
-        return hr;
-    }    
-
-    hr = D3DCompile( g_PixelShader.c_str(), g_PixelShader.length(), nullptr,nullptr, nullptr,
-                                     "Main", "ps_5_0",
-                                     flags, 0, &pshaderBlob, &errorBlob2 );
-    
-    if ( FAILED(hr) )
-    {
-        if ( errorBlob2 )
-        {
-            std::cerr << "here2";
-            OutputDebugStringA( (char*)errorBlob2->GetBufferPointer() );
-            errorBlob2->Release();
-        }
-
-        if ( pshaderBlob )
-           pshaderBlob->Release();
-
-        return hr;
-    } 
-    nvrhi::ShaderDesc vsshaderDesc;
-        vsshaderDesc.shaderType = nvrhi::ShaderType::Vertex;
-        vsshaderDesc.debugName = "vertex";
-        vsshaderDesc.entryName = "Main";
-    nvrhi::ShaderHandle ptrvertexShader = nvrhiDevice->createShader(
-       vsshaderDesc,
-        vshaderBlob->GetBufferPointer(), vshaderBlob->GetBufferSize());
+        {\
+            float4 position: SV_POSITION;\
+            float3 color: COLOR;\
+        };\
+        struct PSOutput\
+        {\
+            float4 color: SV_TARGET;\
+        };\
+        PSOutput Main(PSInput input)\
+        {\
+            PSOutput output = (PSOutput)0;\
+            output.color = float4(input.color, 1.0);\
+            return output;\
+        }\0");
+    hr = CreateShaderFromStrint(ptrvertexShader, ptrpixelShader, g_PixelShader);
 
     nvrhi::VertexAttributeDesc attributes[]  {
         nvrhi::VertexAttributeDesc()
@@ -259,16 +287,10 @@ HRESULT InitD3D(HWND OutputWindow)
             .setElementStride(24),//sizeof(Vertex)),
     };
 
-    nvrhi::InputLayoutHandle inputLayout = nvrhiDevice->createInputLayout(
+    inputLayout = nvrhiDevice->createInputLayout(
         attributes, uint32_t(std::size(attributes)), ptrvertexShader);
         
-    nvrhi::ShaderDesc psshaderDesc;
-        psshaderDesc.shaderType = nvrhi::ShaderType::Pixel;
-        psshaderDesc.debugName = "pixel";
-        psshaderDesc.entryName = "Main";
-    nvrhi::ShaderHandle ptrpixelShader = nvrhiDevice->createShader(
-       psshaderDesc,
-       pshaderBlob->GetBufferPointer(), pshaderBlob->GetBufferSize());
+   
        
     auto framebufferDesc = nvrhi::FramebufferDesc()
     .addColorAttachment(swapChainTexture); // you can specify a particular subresource if necessary
@@ -280,6 +302,38 @@ HRESULT InitD3D(HWND OutputWindow)
     }
     
     
+    
+
+    return hr;
+}
+
+void Render()
+{
+    auto g_PixelShader = std::string("struct PSInput\
+        {\
+            float4 position: SV_POSITION;\
+            float3 color: COLOR;\
+        };\
+        struct PSOutput\
+        {\
+            float4 color: SV_TARGET;\
+        };\
+        PSOutput Main(PSInput input)\
+        {\
+            PSOutput output = (PSOutput)0;\
+            output.color.x = input.color.x * 0.1;\
+            output.color.y = input.color.y * 0.9;\
+            output.color.z = input.color.z;\
+            output.color.w = 1.0f;\
+            return output;\
+        }\0");
+    int tmp = (bagacounter / 100 + 1)%10;
+    int tmpinv = 10 - tmp;
+    g_PixelShader.replace(318, 1, std::to_string(tmp));
+    g_PixelShader.replace(367, 1, std::to_string(tmpinv));
+    bagacounter++;
+    HRESULT hrr = CreateShaderFromStrint(ptrvertexShader, ptrpixelShader, g_PixelShader);
+
     auto pipelineDesc = nvrhi::GraphicsPipelineDesc()
     .setPrimType(nvrhi::PrimitiveType::TriangleList)
     .setInputLayout(inputLayout)
@@ -290,14 +344,9 @@ HRESULT InitD3D(HWND OutputWindow)
     pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
     pipelineDesc.renderState.depthStencilState.stencilEnable = false;
     pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
+    
 
     graphicsPipeline = nvrhiDevice->createGraphicsPipeline(pipelineDesc, framebuffer);
-
-    return hr;
-}
-
-void Render()
-{
     // float clearColor[4] = {0.0f, 0.0f, 0.7f, 1.0f};
     // g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, clearColor);
 
