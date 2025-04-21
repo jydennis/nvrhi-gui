@@ -29,6 +29,7 @@ static const Vertex g_Vertices[3]  {
 };
 
 int bagacounter = 0;
+int btncounter = 0;
 
 nvrhi::TextureHandle swapChainTexture = NULL;
 ID3D11Device* g_pd3dDevice = NULL;
@@ -46,6 +47,30 @@ nvrhi::ShaderHandle ptrvertexShader = nullptr;
 nvrhi::ShaderHandle ptrpixelShader = nullptr;
 
 std::string inputstr;
+
+bool shaderchanged = false;
+
+std::string ori_PixelShader = std::string("struct PSInput\n\
+    {\n\
+        float4 position: SV_POSITION;    \n\
+        float3 color: COLOR;     \n\
+    };     \n\
+    struct PSOutput    \n\
+    {     \n\
+        float4 color: SV_TARGET;    \n\
+    };    \n\
+    PSOutput Main(PSInput input)      \n\
+    {    \n\
+        PSOutput output = (PSOutput)0;     \n\
+        output.color.x = input.color.x * 0.1;    \n\
+        output.color.y = input.color.y * 0.9;    \n\
+        output.color.z = input.color.z;    \n\
+        output.color.w = 1.0f;   \n\
+        return output;    \n\
+    }                                                                                             \0");
+
+std::string tmp_PixelShader = ori_PixelShader;
+std::string used_PixelShader = ori_PixelShader;
 
 struct MessageCallback : public nvrhi::IMessageCallback
 {
@@ -208,8 +233,8 @@ HRESULT InitD3D(HWND OutputWindow, GLFWwindow *window)
     DXGI_SWAP_CHAIN_DESC swapchainDescription;
     ZeroMemory(&swapchainDescription, sizeof(swapchainDescription));
     swapchainDescription.BufferCount = 1;
-    swapchainDescription.BufferDesc.Width = 640;
-    swapchainDescription.BufferDesc.Height = 480;
+    swapchainDescription.BufferDesc.Width = 800;
+    swapchainDescription.BufferDesc.Height = 600;
     swapchainDescription.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     swapchainDescription.BufferDesc.RefreshRate.Numerator = 60;
     swapchainDescription.BufferDesc.RefreshRate.Denominator = 1;
@@ -242,9 +267,9 @@ HRESULT InitD3D(HWND OutputWindow, GLFWwindow *window)
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
-    io.DisplaySize = ImVec2(640,480);
+    io.DisplaySize = ImVec2(800, 600);
     //ImGui_ImplWin32_Init(OutputWindow);
-    ImGui_ImplGlfw_InitForOther(window, false);
+    ImGui_ImplGlfw_InitForOther(window, true);
     
     //ImGui_ImplDX11_Init(g_pd3dDevice, g_pImmediateContext);
     ImGui_ImplDX11_Init(g_pd3dDevice, g_pImmediateContext);
@@ -325,38 +350,37 @@ HRESULT InitD3D(HWND OutputWindow, GLFWwindow *window)
         return false;
     }
 
-   
+   auto pipelineDesc = nvrhi::GraphicsPipelineDesc()
+    .setPrimType(nvrhi::PrimitiveType::TriangleList)
+    .setInputLayout(inputLayout)
+    .setVertexShader(ptrvertexShader)
+    .setPixelShader(ptrpixelShader);
+    //.addBindingLayout(bindingLayout);
+    pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
+    pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
+    pipelineDesc.renderState.depthStencilState.stencilEnable = false;
+    pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
+    
+
+    graphicsPipeline = nvrhiDevice->createGraphicsPipeline(pipelineDesc, framebuffer);
 
     return hr;
 }
 
 void Render()
 {
-    auto g_PixelShader = std::string("struct PSInput\
-        {\
-            float4 position: SV_POSITION;\
-            float3 color: COLOR;\
-        };\
-        struct PSOutput\
-        {\
-            float4 color: SV_TARGET;\
-        };\
-        PSOutput Main(PSInput input)\
-        {\
-            PSOutput output = (PSOutput)0;\
-            output.color.x = input.color.x * 0.1;\
-            output.color.y = input.color.y * 0.9;\
-            output.color.z = input.color.z;\
-            output.color.w = 1.0f;\
-            return output;\
-        }\0");
+    
     int tmp = (bagacounter / 100 + 1)%10;
     int tmpinv = 10 - tmp;
-    g_PixelShader.replace(318, 1, std::to_string(tmp));
-    g_PixelShader.replace(367, 1, std::to_string(tmpinv));
+    //used_PixelShader.replace(318, 1, std::to_string(tmp));
+    //used_PixelShader.replace(367, 1, std::to_string(tmpinv));
     bagacounter++;
-    HRESULT hrr = CreateShaderFromStrint(ptrvertexShader, ptrpixelShader, g_PixelShader);
-
+    if (shaderchanged)
+    {
+        HRESULT hrr = CreateShaderFromStrint(ptrvertexShader, ptrpixelShader, used_PixelShader);
+        shaderchanged = false;
+   
+    
     auto pipelineDesc = nvrhi::GraphicsPipelineDesc()
     .setPrimType(nvrhi::PrimitiveType::TriangleList)
     .setInputLayout(inputLayout)
@@ -372,7 +396,7 @@ void Render()
     graphicsPipeline = nvrhiDevice->createGraphicsPipeline(pipelineDesc, framebuffer);
     // float clearColor[4] = {0.0f, 0.0f, 0.7f, 1.0f};
     // g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, clearColor);
-
+    }
     commandList= nvrhiDevice->createCommandList();
 
     commandList->open();
@@ -415,14 +439,13 @@ void Render()
     auto drawArguments = nvrhi::DrawArguments()
         .setVertexCount(3);
     commandList->draw(drawArguments);
-    ImGui::Begin("Another Window");   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-    ImGui::Text("Hello from another window!");
-    static int counter = 0;
-    if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-        counter++;
-    ImGui::Text("counter = %d", counter);
-    char textBox[50] = "Text Box";
-    ImGui::InputText("Hello", textBox, IM_ARRAYSIZE(textBox));
+    ImGui::Begin("PS shader Window");   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+    ImGui::InputTextMultiline("Hello", tmp_PixelShader.data(), tmp_PixelShader.size(), ImVec2(400, 200));
+    if (ImGui::Button("Update Shader"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+    {    
+        used_PixelShader = tmp_PixelShader;
+        shaderchanged = true;
+    }
     ImGui::End();
     ImGui::Render();
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
@@ -457,9 +480,10 @@ int main()
     glfwShowWindow(window);
     
     while(!glfwWindowShouldClose(window)) {
+       
+        Render();
         glfwPollEvents();
 
-        Render();
 
         
     }
