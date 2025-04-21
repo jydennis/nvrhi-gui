@@ -9,6 +9,12 @@
 #define GLFW_EXPOSE_NATIVE_WIN32 1
 #include <GLFW/glfw3native.h>
 
+#include "imgui.h"
+//#include "../bindings/imgui_impl_win32.h"
+#include "../bindings/imgui_impl_glfw.h"
+#include "../bindings/imgui_impl_dx11.h"
+
+
 struct Vertex {
     float position[3];
     float color[3];
@@ -38,6 +44,8 @@ nvrhi::InputLayoutHandle inputLayout = NULL;
 
 nvrhi::ShaderHandle ptrvertexShader = nullptr;
 nvrhi::ShaderHandle ptrpixelShader = nullptr;
+
+std::string inputstr;
 
 struct MessageCallback : public nvrhi::IMessageCallback
 {
@@ -177,7 +185,7 @@ HRESULT CreateShaderFromStrint(nvrhi::ShaderHandle& ptrvertexShader,nvrhi::Shade
     return hr;
 }
 
-HRESULT InitD3D(HWND OutputWindow)
+HRESULT InitD3D(HWND OutputWindow, GLFWwindow *window)
 {
     bagacounter = 0;
 
@@ -226,6 +234,22 @@ HRESULT InitD3D(HWND OutputWindow)
             break;
         }
     }
+
+    ShowWindow(OutputWindow, SW_HIDE);     
+    UpdateWindow(OutputWindow);
+
+    
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.DisplaySize = ImVec2(640,480);
+    //ImGui_ImplWin32_Init(OutputWindow);
+    ImGui_ImplGlfw_InitForOther(window, false);
+    
+    //ImGui_ImplDX11_Init(g_pd3dDevice, g_pImmediateContext);
+    ImGui_ImplDX11_Init(g_pd3dDevice, g_pImmediateContext);
+    ImGui::StyleColorsDark();
+
     std::cerr << std::hex << outFeatureLevel;
     if(FAILED(hr))
     {
@@ -300,9 +324,8 @@ HRESULT InitD3D(HWND OutputWindow)
         std::cerr<< "Failed to create Scene::framebuffer";
         return false;
     }
-    
-    
-    
+
+   
 
     return hr;
 }
@@ -381,15 +404,35 @@ void Render()
         .addVertexBuffer({vertexBuffer,0,0});
     commandList->setGraphicsState(graphicsState);
      // Clear the primary render target
-   
+
+
+     ImGui_ImplDX11_NewFrame();
+     //ImGui_ImplWin32_NewFrame();
+     ImGui_ImplGlfw_NewFrame();
+     ImGui::NewFrame();
+
+
     auto drawArguments = nvrhi::DrawArguments()
         .setVertexCount(3);
     commandList->draw(drawArguments);
-    
+    ImGui::Begin("Another Window");   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+    ImGui::Text("Hello from another window!");
+    static int counter = 0;
+    if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+        counter++;
+    ImGui::Text("counter = %d", counter);
+    char textBox[50] = "Text Box";
+    ImGui::InputText("Hello", textBox, IM_ARRAYSIZE(textBox));
+    ImGui::End();
+    ImGui::Render();
+    ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
     commandList->close();
     nvrhiDevice->executeCommandList(commandList);
+    
+    
 
+    
     g_pSwapChain->Present(0,0);
 }
 
@@ -403,19 +446,28 @@ int main()
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow* window = glfwCreateWindow(800, 600, "NVRHI + DX11 Demo", nullptr, nullptr);
+    glfwMakeContextCurrent(window);
     if (!window) {
         std::cerr << "Failed to create GLFW window!\n";
         glfwTerminate();
         return -1;
     }
 
-    InitD3D(glfwGetWin32Window(window));
+    InitD3D(glfwGetWin32Window(window), window);
     glfwShowWindow(window);
+    
     while(!glfwWindowShouldClose(window)) {
-        Render();
         glfwPollEvents();
-    }
 
+        Render();
+
+        
+    }
+    ImGui_ImplDX11_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    //ImGui_ImplWin32_Shutdown();
+    ImGui::DestroyContext();
+    
     glfwDestroyWindow(window);
     glfwTerminate();
     return 0;
