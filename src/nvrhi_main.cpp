@@ -39,16 +39,20 @@ ID3D11RenderTargetView* g_pRenderTargetView = NULL;
 nvrhi::DeviceHandle nvrhiDevice=NULL;
 nvrhi::CommandListHandle commandList = NULL;
 nvrhi::GraphicsPipelineHandle graphicsPipeline =NULL;
+nvrhi::GraphicsPipelineHandle graphicsPipeline2 =NULL;
 nvrhi::FramebufferHandle framebuffer=NULL;
 nvrhi::InputLayoutHandle inputLayout = NULL;
 
 
 nvrhi::ShaderHandle ptrvertexShader = nullptr;
 nvrhi::ShaderHandle ptrpixelShader = nullptr;
+nvrhi::ShaderHandle ptrvertexShader2 = nullptr;
+nvrhi::ShaderHandle ptrpixelShader2 = nullptr;
 
 std::string inputstr;
 
 bool shaderchanged = false;
+bool shaderchanged2 = false;
 
 std::string ori_PixelShader = std::string("struct PSInput\n\
     {\n\
@@ -69,8 +73,11 @@ std::string ori_PixelShader = std::string("struct PSInput\n\
         return output;    \n\
     }                                                                                             \0");
 
+
 std::string tmp_PixelShader = ori_PixelShader;
 std::string used_PixelShader = ori_PixelShader;
+std::string tmp_PixelShader2 = ori_PixelShader;
+std::string used_PixelShader2 = ori_PixelShader;
 
 struct MessageCallback : public nvrhi::IMessageCallback
 {
@@ -212,6 +219,9 @@ HRESULT CreateShaderFromStrint(nvrhi::ShaderHandle& ptrvertexShader,nvrhi::Shade
 
 HRESULT InitD3D(HWND OutputWindow, GLFWwindow *window)
 {
+    int sstrsize = ori_PixelShader.size()*2;
+    ori_PixelShader.resize(sstrsize);
+
     bagacounter = 0;
 
     HRESULT hr = S_OK;
@@ -267,7 +277,9 @@ HRESULT InitD3D(HWND OutputWindow, GLFWwindow *window)
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
-    io.DisplaySize = ImVec2(800, 600);
+    io.DisplaySize = ImVec2(960, 600);
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     //ImGui_ImplWin32_Init(OutputWindow);
     ImGui_ImplGlfw_InitForOther(window, true);
     
@@ -363,8 +375,20 @@ HRESULT InitD3D(HWND OutputWindow, GLFWwindow *window)
     
 
     graphicsPipeline = nvrhiDevice->createGraphicsPipeline(pipelineDesc, framebuffer);
+    graphicsPipeline2 = nvrhiDevice->createGraphicsPipeline(pipelineDesc, framebuffer);
 
     return hr;
+}
+
+auto callback_resize(ImGuiInputTextCallbackData* data) -> int
+{
+    if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
+    {
+        std::vector<char>* buf = (std::vector<char>*)data->UserData;
+        buf->resize(data->BufTextLen + 1);  // +1 留给 '\0'
+        data->Buf = buf->data();
+    }
+    return 0;
 }
 
 void Render()
@@ -397,6 +421,28 @@ void Render()
     // float clearColor[4] = {0.0f, 0.0f, 0.7f, 1.0f};
     // g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, clearColor);
     }
+    if (shaderchanged2)
+    {
+        HRESULT hrr = CreateShaderFromStrint(ptrvertexShader2, ptrpixelShader2, used_PixelShader2);
+        shaderchanged2 = false;
+   
+    
+    auto pipelineDesc = nvrhi::GraphicsPipelineDesc()
+    .setPrimType(nvrhi::PrimitiveType::TriangleList)
+    .setInputLayout(inputLayout)
+    .setVertexShader(ptrvertexShader2)
+    .setPixelShader(ptrpixelShader2);
+    //.addBindingLayout(bindingLayout);
+    pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
+    pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
+    pipelineDesc.renderState.depthStencilState.stencilEnable = false;
+    pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
+    
+
+    graphicsPipeline2 = nvrhiDevice->createGraphicsPipeline(pipelineDesc, framebuffer);
+    // float clearColor[4] = {0.0f, 0.0f, 0.7f, 1.0f};
+    // g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, clearColor);
+    }
     commandList= nvrhiDevice->createCommandList();
 
     commandList->open();
@@ -423,41 +469,90 @@ void Render()
     auto graphicsState = nvrhi::GraphicsState()
         .setPipeline(graphicsPipeline)
         .setFramebuffer(framebuffer)
-        .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(nvrhi::Viewport(640.f, 480.f)))
+        .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(nvrhi::Viewport(320.0f,640.f, 0.0f,240.f,0.0f,1.0f)))
         //.addBindingSet(bindingSet)
         .addVertexBuffer({vertexBuffer,0,0});
-    commandList->setGraphicsState(graphicsState);
-     // Clear the primary render target
 
+     // Clear the primary render target
+    auto graphicsState2 = nvrhi::GraphicsState()
+        .setPipeline(graphicsPipeline2)
+        .setFramebuffer(framebuffer)
+        .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(nvrhi::Viewport(321.f,640.f, 241.f,480.f,0.0f,1.0f)))
+        //.addBindingSet(bindingSet)
+        .addVertexBuffer({vertexBuffer,0,0});
+
+    commandList->setGraphicsState(graphicsState);
 
      ImGui_ImplDX11_NewFrame();
      //ImGui_ImplWin32_NewFrame();
      ImGui_ImplGlfw_NewFrame();
      ImGui::NewFrame();
+        ImGui::DockSpaceOverViewport(ImGui::GetMainViewport()->ID);
 
+   
 
     auto drawArguments = nvrhi::DrawArguments()
         .setVertexCount(3);
+
+   //ImGui::Begin("The Triangle");
     commandList->draw(drawArguments);
-    ImGui::Begin("PS shader Window");   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-    ImGui::InputTextMultiline("Hello", tmp_PixelShader.data(), tmp_PixelShader.size(), ImVec2(400, 200));
+    //commandList->close();
+    //nvrhiDevice->executeCommandList(commandList);
+
+    commandList->setGraphicsState(graphicsState2);
+
+    drawArguments = nvrhi::DrawArguments()
+        .setVertexCount(3);
+
+    commandList->draw(drawArguments);
+    commandList->close();
+    nvrhiDevice->executeCommandList(commandList);
+
+    //ImGui::End();
+     //ImGui::DockSpaceOverViewport(ImGui::GetMainViewport()->ID);
+    bool show_another_window = true;
+    ImGui::Begin("PS shader Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+    ImGui::InputTextMultiline("Hello", tmp_PixelShader.data(), tmp_PixelShader.size(), ImVec2(600, 300), ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackResize,
+    callback_resize,
+    &tmp_PixelShader);
     if (ImGui::Button("Update Shader"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
     {    
         used_PixelShader = tmp_PixelShader;
         shaderchanged = true;
     }
     ImGui::End();
+    bool show_window = true;
+    ImGui::Begin("PS shader Window2", &show_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+    ImGui::InputTextMultiline("Hello", tmp_PixelShader2.data(), tmp_PixelShader2.size(), ImVec2(600, 300), ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackResize,
+    callback_resize,
+    &tmp_PixelShader2);
+    if (ImGui::Button("Update Shader"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+    {    
+        used_PixelShader2 = tmp_PixelShader2;
+        shaderchanged2 = true;
+    }
+    ImGui::End();
+
     ImGui::Render();
+
+
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
-    commandList->close();
-    nvrhiDevice->executeCommandList(commandList);
-    
     
 
+    // commandList->close();
+    // ImGui::Begin("The Triangle");
+    // nvrhiDevice->executeCommandList(commandList);
+    // ImGui::End();
+    //ImGui::Render();
     
     g_pSwapChain->Present(0,0);
+
+    ImGui::UpdatePlatformWindows();
+    ImGui::RenderPlatformWindowsDefault();
 }
+
+
 
 int main()
 {
