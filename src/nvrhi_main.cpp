@@ -20,13 +20,14 @@
 struct Vertex {
     float position[3];
     float color[3];
+     float uv[2];
 };
 
 static const Vertex g_Vertices[3]  {
-    //  position          COLOR
-    { { -0.5f, -0.5f, 0.f }, { 1.f, 0.f, 0.f } },
-    { { 0.5f, -0.5f, 0.f }, { 0.f, 1.f, 0.f } },
-    { { 0.0f, 0.5f, 0.f }, { 0.f, 0.f, 1.f } },
+    //  position          COLOR                   uv
+    { { -1.f, -1.f, 0.f }, { 1.f, 0.f, 0.f }, { 0.0f, 0.1f },},
+    { { 1.f, -1.f, 0.f }, { 0.f, 1.f, 0.f }, { 0.1f, 0.1f }, },
+    { { -1.f, 1.f, 0.f }, { 0.f, 0.f, 1.f }, { 0.0f, 0.0f }, },
     // and so on...
 };
 
@@ -57,23 +58,41 @@ bool shaderchanged = false;
 bool shaderchanged2 = false;
 
 std::string ori_PixelShader = std::string("struct PSInput\n\
-    {\n\
-        float4 position: SV_POSITION;    \n\
-        float3 color: COLOR;     \n\
-    };     \n\
-    struct PSOutput    \n\
-    {     \n\
-        float4 color: SV_TARGET;    \n\
-    };    \n\
-    PSOutput Main(PSInput input)      \n\
-    {    \n\
-        PSOutput output = (PSOutput)0;     \n\
-        output.color.x = input.color.x * 0.1;    \n\
-        output.color.y = input.color.y * 0.9;    \n\
-        output.color.z = input.color.z;    \n\
-        output.color.w = 1.0f;   \n\
-        return output;    \n\
-    }                                                                                             \0");
+        {\n\
+            float4 position: SV_POSITION;\n\
+            float3 color: COLOR0;\n\
+            float2 uv  : TEXCOORD0;\n\
+        };\n\
+        struct PSOutput\n\
+        {\
+            float4 color: SV_TARGET;\n\
+        };\
+        Texture2D tex0 : register(t0);\n\
+        SamplerState samp0 : register(s0);\n\
+        PSOutput Main(PSInput input)\
+        {\n\
+            PSOutput output;\n\
+            output.color =  tex0.Sample(samp0, input.uv);\n\
+            return output;\
+        }\0                                                                                        ");
+// std::string("struct PSInput\n\
+//     {\n\
+//         float4 position: SV_POSITION;    \n\
+//         float3 color: COLOR;     \n\
+//     };     \n\
+//     struct PSOutput    \n\
+//     {     \n\
+//         float4 color: SV_TARGET;    \n\
+//     };    \n\
+//     PSOutput Main(PSInput input)      \n\
+//     {    \n\
+//         PSOutput output = (PSOutput)0;     \n\
+//         output.color.x = input.color.x * 0.1;    \n\
+//         output.color.y = input.color.y * 0.9;    \n\
+//         output.color.z = input.color.z;    \n\
+//         output.color.w = 1.0f;   \n\
+//         return output;    \n\
+//     }                                                                                             \0");
 
 
 std::string tmp_PixelShader = ori_PixelShader;
@@ -115,15 +134,22 @@ private:
 	uint8_t MinLogLevel;
 };
 
-UINT64 LoadImage(nvrhi::TextureHandle& myTexture, stbi_uc* pixels) 
+UINT64 LoadImage(nvrhi::TextureHandle& myTexture, unsigned char* pixels,int & wid, int & hei) 
 {
     int width, height, channels;
-    pixels = stbi_load("input.png", &width, &height, &channels,  STBI_rgb_alpha);
+    stbi_set_flip_vertically_on_load(true);
+    pixels = stbi_load("input.png", &width, &height, &channels,  4);
     if (!pixels) {
     printf("Failed to load image!\n");
     }
+    printf("load image w:%d, h:%d\n",width,height);
     UINT64 imageRowPitch = UINT64(width) * 4;
-
+    wid= width;
+    hei  = height;
+    if (channels != 4)
+    {
+        printf("image channel mismatce.\n");
+    }
     
     return imageRowPitch;
 }
@@ -136,18 +162,21 @@ HRESULT CreateShaderFromStrint(nvrhi::ShaderHandle& ptrvertexShader,nvrhi::Shade
     auto g_VertexShader = std::string("struct VSInput\
         {\
             float3 position: POSITION;\
-            float3 color: COLOR;\
+            float3 color: COLOR0;\
+            float2 uv  : TEXCOORD0;\
         };\
         struct VSOutput\
         {\
             float4 position: SV_POSITION;\
-            float3 color: COLOR;\
+            float3 color: COLOR0;\
+            float2 uv  : TEXCOORD0;\
         };\
         VSOutput Main(VSInput input)\
         {\
             VSOutput output = (VSOutput)0;\
             output.position = float4(input.position, 1.0);\
             output.color = input.color;\
+            output.uv = input.uv;\
             return output;\
         }\0");
     // auto g_PixelShader = std::string("struct PSInput\
@@ -336,16 +365,19 @@ HRESULT InitD3D(HWND OutputWindow, GLFWwindow *window)
     auto g_PixelShader = std::string("struct PSInput\
         {\
             float4 position: SV_POSITION;\
-            float3 color: COLOR;\
+            float3 color: COLOR0;\
+            float2 uv  : TEXCOORD0;\
         };\
         struct PSOutput\
         {\
             float4 color: SV_TARGET;\
         };\
+        Texture2D tex0 : register(t0);\
+        SamplerState samp0 : register(s0);\
         PSOutput Main(PSInput input)\
         {\
-            PSOutput output = (PSOutput)0;\
-            output.color = float4(input.color, 1.0);\
+            PSOutput output;\
+            output.color =  tex0.Sample(samp0, input.uv);\
             return output;\
         }\0");
     hr = CreateShaderFromStrint(ptrvertexShader, ptrpixelShader, g_PixelShader);
@@ -355,12 +387,17 @@ HRESULT InitD3D(HWND OutputWindow, GLFWwindow *window)
             .setName("POSITION")
             .setFormat(nvrhi::Format::RGB32_FLOAT)
             .setOffset(0)//offsetof(Vertex, position))
-            .setElementStride(24),//sizeof(Vertex)),
+            .setElementStride(32),//sizeof(Vertex)),
         nvrhi::VertexAttributeDesc()
-            .setName("COLOR")
+            .setName("COLOR0")
             .setFormat(nvrhi::Format::RGB32_FLOAT)
             .setOffset(12)//offsetof(Vertex, color))
-            .setElementStride(24),//sizeof(Vertex)),
+            .setElementStride(32),//sizeof(Vertex)),
+        nvrhi::VertexAttributeDesc()
+            .setName("TEXCOORD0")
+            .setFormat(nvrhi::Format::RG32_FLOAT)
+            .setOffset(24)//offsetof(Vertex, color))
+            .setElementStride(32),//sizeof(Vertex)),
     };
 
     inputLayout = nvrhiDevice->createInputLayout(
@@ -414,30 +451,64 @@ void Render()
     //used_PixelShader.replace(318, 1, std::to_string(tmp));
     //used_PixelShader.replace(367, 1, std::to_string(tmpinv));
     
+
+    const unsigned char* pixelsdata;
+    int imgwidth,imgheight;
+    //UINT64 imageRowPitch = LoadImage(myTexture, pixelsdata, imgwidth,imgheight);
+    //if (shaderchanged) {
+    int loadwidth, loadheight, loadchannels;
+    stbi_set_flip_vertically_on_load(true);
+    pixelsdata = stbi_load("input.jpg", &loadwidth, &loadheight, &loadchannels,  4);
+    if (!pixelsdata) {
+    printf("Failed to load image!\n");
+    }
+    printf("load image w:%d, h:%d\n",loadwidth,loadheight);
+    UINT64 imageRowPitch = UINT64(loadwidth) * 4;
+    if (loadchannels != 4)
+    {
+        printf("image channel mismatce.\n");
+    }
+
      // texture to show
     auto showImgtextureDesc = nvrhi::TextureDesc()
     .setDimension(nvrhi::TextureDimension::Texture2D)
     .setFormat(nvrhi::Format::RGBA8_UNORM)
-    .setWidth(640)
-    .setHeight(480)
+    .setWidth(loadwidth)
+    .setHeight(loadheight)
     .setIsRenderTarget(false)
     .setDebugName("show texture Image")
-    .setIsUAV(false);
+    .setIsUAV(true);
+    showImgtextureDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 
     nvrhi::TextureHandle myTexture = nvrhiDevice->createTexture(showImgtextureDesc);
     
-    stbi_uc* pixels;
-    UINT64 imageRowPitch = LoadImage(myTexture, pixels);
+    
+    //}
+    // commandList2= nvrhiDevice->createCommandList();
+
+    // commandList2->open();
+    // commandList2->writeTexture(myTexture, 0, 0, pixels,640*4);
+    // commandList2->close();
+    // nvrhiDevice->executeCommandList(commandList2);
 
     nvrhi::BindingLayoutDesc layoutDesc;
+    layoutDesc.visibility = nvrhi::ShaderType::Pixel;
     layoutDesc.bindings = {
-        nvrhi::BindingLayoutItem::Texture_SRV(0)  // slot 0 对应上面的 binding
+        nvrhi::BindingLayoutItem::Texture_SRV(0),  // slot 0 对应上面的 binding
+         nvrhi::BindingLayoutItem::Sampler(0)       // s1
     };
     nvrhi::BindingLayoutHandle bindingLayout = nvrhiDevice->createBindingLayout(layoutDesc);
 
+    nvrhi::SamplerDesc sampDesc;
+    sampDesc.addressU = nvrhi::SamplerAddressMode::Wrap;
+    sampDesc.addressV = nvrhi::SamplerAddressMode::Wrap;
+
+    nvrhi::SamplerHandle sampler = nvrhiDevice->createSampler(sampDesc);
+
     nvrhi::BindingSetDesc bindingSetDesc;
     bindingSetDesc.bindings = {
-        nvrhi::BindingSetItem::Texture_SRV(0, myTexture)  // slot = 0
+        nvrhi::BindingSetItem::Texture_SRV(0, myTexture),  // slot = 0
+        nvrhi::BindingSetItem::Sampler(0, sampler)
     };
     nvrhi::BindingSetHandle bindingSet = nvrhiDevice->createBindingSet(bindingSetDesc, bindingLayout);
 
@@ -499,12 +570,7 @@ void Render()
 
         graphicsPipeline = nvrhiDevice->createGraphicsPipeline(pipelineDesc, framebuffer);
     }
-    // commandList2= nvrhiDevice->createCommandList();
-
-    // commandList2->open();
-    // commandList2->writeTexture(myTexture, 0, 0, pixels,680*4,640*480*4);
-    // commandList2->close();
-    // nvrhiDevice->executeCommandList(commandList2);
+    
     commandList= nvrhiDevice->createCommandList();
     commandList->open();
     commandList->clearTextureFloat(swapChainTexture, nvrhi::AllSubresources, nvrhi::Color{  0.0f, 0.0f, 0.7f, 1.0f });
@@ -520,7 +586,10 @@ void Render()
     nvrhi::BufferHandle vertexBuffer  = nvrhiDevice->createBuffer(vertexBufferDesc);
 
     commandList->writeBuffer(vertexBuffer, g_Vertices, sizeof(g_Vertices));
-
+    //if(shaderchanged) {
+        commandList->writeTexture(myTexture, 0, 0, pixelsdata, imageRowPitch,imageRowPitch*loadheight);
+        printf("write texture cmd recorded");
+    //}
     // auto bindingSetDesc = nvrhi::BindingSetDesc();
 
     // nvrhi::BindingSetHandle bindingSet = nvrhiDevice->createBindingSet(bindingSetDesc, bindingLayout);
@@ -597,7 +666,6 @@ void Render()
 
 
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-
     
 
     // commandList->close();
@@ -633,7 +701,7 @@ int main()
 
     InitD3D(glfwGetWin32Window(window), window);
     glfwShowWindow(window);
-    
+    shaderchanged = true;
     while(!glfwWindowShouldClose(window)) {
        
         Render();
