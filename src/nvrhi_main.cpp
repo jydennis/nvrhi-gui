@@ -25,9 +25,9 @@ struct Vertex {
 
 static const Vertex g_Vertices[3]  {
     //  position          COLOR                   uv
-    { { -1.f, -1.f, 0.f }, { 1.f, 0.f, 0.f }, { 0.0f, 0.1f },},
-    { { 1.f, -1.f, 0.f }, { 0.f, 1.f, 0.f }, { 0.1f, 0.1f }, },
-    { { -1.f, 1.f, 0.f }, { 0.f, 0.f, 1.f }, { 0.0f, 0.0f }, },
+    { { -1.f, -1.f, 0.f }, { 1.f, 0.f, 0.f }, { 0.0f, 1.0f }},
+    { { 1.f, -1.f, 0.f }, { 0.f, 0.f, 0.f }, { 1.0f, 1.0f } },
+    { { -1.f, 1.f, 0.f }, { 0.f, 0.f, 1.f }, { 0.0f, 0.0f } },
     // and so on...
 };
 
@@ -162,8 +162,8 @@ HRESULT CreateShaderFromStrint(nvrhi::ShaderHandle& ptrvertexShader,nvrhi::Shade
     auto g_VertexShader = std::string("struct VSInput\
         {\
             float3 position: POSITION;\
-            float3 color: COLOR0;\
-            float2 uv  : TEXCOORD0;\
+            float3 color: COLOR;\
+            float2 uv  : TEXCOORD;\
         };\
         struct VSOutput\
         {\
@@ -389,12 +389,12 @@ HRESULT InitD3D(HWND OutputWindow, GLFWwindow *window)
             .setOffset(0)//offsetof(Vertex, position))
             .setElementStride(32),//sizeof(Vertex)),
         nvrhi::VertexAttributeDesc()
-            .setName("COLOR0")
+            .setName("COLOR")
             .setFormat(nvrhi::Format::RGB32_FLOAT)
             .setOffset(12)//offsetof(Vertex, color))
             .setElementStride(32),//sizeof(Vertex)),
         nvrhi::VertexAttributeDesc()
-            .setName("TEXCOORD0")
+            .setName("TEXCOORD")
             .setFormat(nvrhi::Format::RG32_FLOAT)
             .setOffset(24)//offsetof(Vertex, color))
             .setElementStride(32),//sizeof(Vertex)),
@@ -457,7 +457,7 @@ void Render()
     //UINT64 imageRowPitch = LoadImage(myTexture, pixelsdata, imgwidth,imgheight);
     //if (shaderchanged) {
     int loadwidth, loadheight, loadchannels;
-    stbi_set_flip_vertically_on_load(true);
+    //stbi_set_flip_vertically_on_load(true);
     pixelsdata = stbi_load("input.jpg", &loadwidth, &loadheight, &loadchannels,  4);
     if (!pixelsdata) {
     printf("Failed to load image!\n");
