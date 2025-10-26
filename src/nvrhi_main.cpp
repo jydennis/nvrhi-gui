@@ -14,6 +14,8 @@
 #include "../bindings/imgui_impl_glfw.h"
 #include "../bindings/imgui_impl_dx11.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 struct Vertex {
     float position[3];
@@ -38,11 +40,11 @@ IDXGISwapChain* g_pSwapChain = NULL;
 ID3D11RenderTargetView* g_pRenderTargetView = NULL;
 nvrhi::DeviceHandle nvrhiDevice=NULL;
 nvrhi::CommandListHandle commandList = NULL;
+nvrhi::CommandListHandle commandList2 = NULL;
 nvrhi::GraphicsPipelineHandle graphicsPipeline =NULL;
 nvrhi::GraphicsPipelineHandle graphicsPipeline2 =NULL;
 nvrhi::FramebufferHandle framebuffer=NULL;
 nvrhi::InputLayoutHandle inputLayout = NULL;
-
 
 nvrhi::ShaderHandle ptrvertexShader = nullptr;
 nvrhi::ShaderHandle ptrpixelShader = nullptr;
@@ -112,6 +114,19 @@ struct MessageCallback : public nvrhi::IMessageCallback
 private:
 	uint8_t MinLogLevel;
 };
+
+UINT64 LoadImage(nvrhi::TextureHandle& myTexture, stbi_uc* pixels) 
+{
+    int width, height, channels;
+    pixels = stbi_load("input.png", &width, &height, &channels,  STBI_rgb_alpha);
+    if (!pixels) {
+    printf("Failed to load image!\n");
+    }
+    UINT64 imageRowPitch = UINT64(width) * 4;
+
+    
+    return imageRowPitch;
+}
 
 
 HRESULT CreateShaderFromStrint(nvrhi::ShaderHandle& ptrvertexShader,nvrhi::ShaderHandle& ptrpixelShader, std::string g_PixelShader)
@@ -398,30 +413,57 @@ void Render()
     int tmpinv = 10 - tmp;
     //used_PixelShader.replace(318, 1, std::to_string(tmp));
     //used_PixelShader.replace(367, 1, std::to_string(tmpinv));
+    
+     // texture to show
+    auto showImgtextureDesc = nvrhi::TextureDesc()
+    .setDimension(nvrhi::TextureDimension::Texture2D)
+    .setFormat(nvrhi::Format::RGBA8_UNORM)
+    .setWidth(640)
+    .setHeight(480)
+    .setIsRenderTarget(false)
+    .setDebugName("show texture Image")
+    .setIsUAV(false);
+
+    nvrhi::TextureHandle myTexture = nvrhiDevice->createTexture(showImgtextureDesc);
+    
+    stbi_uc* pixels;
+    UINT64 imageRowPitch = LoadImage(myTexture, pixels);
+
+    nvrhi::BindingLayoutDesc layoutDesc;
+    layoutDesc.bindings = {
+        nvrhi::BindingLayoutItem::Texture_SRV(0)  // slot 0 对应上面的 binding
+    };
+    nvrhi::BindingLayoutHandle bindingLayout = nvrhiDevice->createBindingLayout(layoutDesc);
+
+    nvrhi::BindingSetDesc bindingSetDesc;
+    bindingSetDesc.bindings = {
+        nvrhi::BindingSetItem::Texture_SRV(0, myTexture)  // slot = 0
+    };
+    nvrhi::BindingSetHandle bindingSet = nvrhiDevice->createBindingSet(bindingSetDesc, bindingLayout);
+
+
     bagacounter++;
     if (shaderchanged)
     {
         HRESULT hrr = CreateShaderFromStrint(ptrvertexShader, ptrpixelShader, used_PixelShader);
         shaderchanged = false;
    
-    
-    auto pipelineDesc = nvrhi::GraphicsPipelineDesc()
-    .setPrimType(nvrhi::PrimitiveType::TriangleList)
-    .setInputLayout(inputLayout)
-    .setVertexShader(ptrvertexShader)
-    .setPixelShader(ptrpixelShader);
-    //.addBindingLayout(bindingLayout);
-    pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
-    pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
-    pipelineDesc.renderState.depthStencilState.stencilEnable = false;
-    pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
-    
+        auto pipelineDesc = nvrhi::GraphicsPipelineDesc()
+        .setPrimType(nvrhi::PrimitiveType::TriangleList)
+        .setInputLayout(inputLayout)
+        .setVertexShader(ptrvertexShader)
+        .addBindingLayout(bindingLayout)
+        .setPixelShader(ptrpixelShader);
+        pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
+        pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
+        pipelineDesc.renderState.depthStencilState.stencilEnable = false;
+        pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
+        
 
-    graphicsPipeline = nvrhiDevice->createGraphicsPipeline(pipelineDesc, framebuffer);
-    // float clearColor[4] = {0.0f, 0.0f, 0.7f, 1.0f};
-    // g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, clearColor);
-    }
-    if (shaderchanged2)
+        graphicsPipeline = nvrhiDevice->createGraphicsPipeline(pipelineDesc, framebuffer);
+        // float clearColor[4] = {0.0f, 0.0f, 0.7f, 1.0f};
+        // g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, clearColor);
+    }else if (shaderchanged2)
     {
         HRESULT hrr = CreateShaderFromStrint(ptrvertexShader2, ptrpixelShader2, used_PixelShader2);
         shaderchanged2 = false;
@@ -431,8 +473,8 @@ void Render()
     .setPrimType(nvrhi::PrimitiveType::TriangleList)
     .setInputLayout(inputLayout)
     .setVertexShader(ptrvertexShader2)
-    .setPixelShader(ptrpixelShader2);
-    //.addBindingLayout(bindingLayout);
+    .addBindingLayout(bindingLayout)
+    .setPixelShader(ptrpixelShader);
     pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
     pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
     pipelineDesc.renderState.depthStencilState.stencilEnable = false;
@@ -442,11 +484,29 @@ void Render()
     graphicsPipeline2 = nvrhiDevice->createGraphicsPipeline(pipelineDesc, framebuffer);
     // float clearColor[4] = {0.0f, 0.0f, 0.7f, 1.0f};
     // g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, clearColor);
+    } else {
+        auto pipelineDesc = nvrhi::GraphicsPipelineDesc()
+        .setPrimType(nvrhi::PrimitiveType::TriangleList)
+        .setInputLayout(inputLayout)
+        .setVertexShader(ptrvertexShader)
+        .addBindingLayout(bindingLayout)
+        .setPixelShader(ptrpixelShader);
+        pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
+        pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
+        pipelineDesc.renderState.depthStencilState.stencilEnable = false;
+        pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
+        
+
+        graphicsPipeline = nvrhiDevice->createGraphicsPipeline(pipelineDesc, framebuffer);
     }
+    // commandList2= nvrhiDevice->createCommandList();
+
+    // commandList2->open();
+    // commandList2->writeTexture(myTexture, 0, 0, pixels,680*4,640*480*4);
+    // commandList2->close();
+    // nvrhiDevice->executeCommandList(commandList2);
     commandList= nvrhiDevice->createCommandList();
-
     commandList->open();
-
     commandList->clearTextureFloat(swapChainTexture, nvrhi::AllSubresources, nvrhi::Color{  0.0f, 0.0f, 0.7f, 1.0f });
     // Draw our geometry
 
@@ -470,7 +530,7 @@ void Render()
         .setPipeline(graphicsPipeline)
         .setFramebuffer(framebuffer)
         .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(nvrhi::Viewport(320.0f,640.f, 0.0f,240.f,0.0f,1.0f)))
-        //.addBindingSet(bindingSet)
+        .addBindingSet(bindingSet)
         .addVertexBuffer({vertexBuffer,0,0});
 
      // Clear the primary render target
@@ -478,7 +538,7 @@ void Render()
         .setPipeline(graphicsPipeline2)
         .setFramebuffer(framebuffer)
         .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(nvrhi::Viewport(321.f,640.f, 241.f,480.f,0.0f,1.0f)))
-        //.addBindingSet(bindingSet)
+        .addBindingSet(bindingSet)
         .addVertexBuffer({vertexBuffer,0,0});
 
     commandList->setGraphicsState(graphicsState);
