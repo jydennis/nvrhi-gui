@@ -23,11 +23,12 @@ struct Vertex {
      float uv[2];
 };
 
-static const Vertex g_Vertices[3]  {
+static const Vertex g_Vertices[4]  {
     //  position          COLOR                   uv
     { { -1.f, -1.f, 0.f }, { 1.f, 0.f, 0.f }, { 0.0f, 1.0f }},
     { { 1.f, -1.f, 0.f }, { 0.f, 0.f, 0.f }, { 1.0f, 1.0f } },
     { { -1.f, 1.f, 0.f }, { 0.f, 0.f, 1.f }, { 0.0f, 0.0f } },
+     { { 1.f, 1.f, 0.f }, { 1.f, 0.f, 0.f }, { 1.0f, 0.0f }},
     // and so on...
 };
 
@@ -415,7 +416,7 @@ HRESULT InitD3D(HWND OutputWindow, GLFWwindow *window)
     }
 
    auto pipelineDesc = nvrhi::GraphicsPipelineDesc()
-    .setPrimType(nvrhi::PrimitiveType::TriangleList)
+    .setPrimType(nvrhi::PrimitiveType::TriangleStrip)
     .setInputLayout(inputLayout)
     .setVertexShader(ptrvertexShader)
     .setPixelShader(ptrpixelShader);
@@ -520,7 +521,7 @@ void Render()
         shaderchanged = false;
    
         auto pipelineDesc = nvrhi::GraphicsPipelineDesc()
-        .setPrimType(nvrhi::PrimitiveType::TriangleList)
+        .setPrimType(nvrhi::PrimitiveType::TriangleStrip)
         .setInputLayout(inputLayout)
         .setVertexShader(ptrvertexShader)
         .addBindingLayout(bindingLayout)
@@ -541,7 +542,7 @@ void Render()
    
     
     auto pipelineDesc = nvrhi::GraphicsPipelineDesc()
-    .setPrimType(nvrhi::PrimitiveType::TriangleList)
+    .setPrimType(nvrhi::PrimitiveType::TriangleStrip)
     .setInputLayout(inputLayout)
     .setVertexShader(ptrvertexShader2)
     .addBindingLayout(bindingLayout)
@@ -557,7 +558,7 @@ void Render()
     // g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, clearColor);
     } else {
         auto pipelineDesc = nvrhi::GraphicsPipelineDesc()
-        .setPrimType(nvrhi::PrimitiveType::TriangleList)
+        .setPrimType(nvrhi::PrimitiveType::TriangleStrip)
         .setInputLayout(inputLayout)
         .setVertexShader(ptrvertexShader)
         .addBindingLayout(bindingLayout)
@@ -621,7 +622,7 @@ void Render()
    
 
     auto drawArguments = nvrhi::DrawArguments()
-        .setVertexCount(3);
+        .setVertexCount(4);
 
    //ImGui::Begin("The Triangle");
     commandList->draw(drawArguments);
@@ -631,7 +632,7 @@ void Render()
     commandList->setGraphicsState(graphicsState2);
 
     drawArguments = nvrhi::DrawArguments()
-        .setVertexCount(3);
+        .setVertexCount(4);
 
     commandList->draw(drawArguments);
     commandList->close();
