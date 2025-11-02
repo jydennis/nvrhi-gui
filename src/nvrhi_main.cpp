@@ -599,7 +599,7 @@ void Render()
     auto graphicsState = nvrhi::GraphicsState()
         .setPipeline(graphicsPipeline)
         .setFramebuffer(framebuffer)
-        .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(nvrhi::Viewport(320.0f,640.f, 0.0f,240.f,0.0f,1.0f)))
+        .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(nvrhi::Viewport(0.0f,400.0f, 0.0f,300.f,0.0f,1.0f)))
         .addBindingSet(bindingSet)
         .addVertexBuffer({vertexBuffer,0,0});
 
@@ -607,7 +607,7 @@ void Render()
     auto graphicsState2 = nvrhi::GraphicsState()
         .setPipeline(graphicsPipeline2)
         .setFramebuffer(framebuffer)
-        .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(nvrhi::Viewport(321.f,640.f, 241.f,480.f,0.0f,1.0f)))
+        .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(nvrhi::Viewport(0.f,400.f, 301.f,600.f,0.0f,1.0f)))
         .addBindingSet(bindingSet)
         .addVertexBuffer({vertexBuffer,0,0});
 
