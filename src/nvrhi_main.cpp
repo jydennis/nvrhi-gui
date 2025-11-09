@@ -14,8 +14,7 @@
 #include "../bindings/imgui_impl_glfw.h"
 #include "../bindings/imgui_impl_dx11.h"
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "ImgLoad_streamer.h"
 
 struct Vertex {
     float position[3];
@@ -50,13 +49,13 @@ nvrhi::InputLayoutHandle inputLayout = NULL;
 
 nvrhi::ShaderHandle ptrvertexShader = nullptr;
 nvrhi::ShaderHandle ptrpixelShader = nullptr;
-nvrhi::ShaderHandle ptrvertexShader2 = nullptr;
-nvrhi::ShaderHandle ptrpixelShader2 = nullptr;
+
+ImgLoader_Streamer Img_Loader{};
 
 std::string inputstr;
 
 bool shaderchanged = false;
-bool shaderchanged2 = false;
+bool imagechanged = true;
 
 std::string ori_PixelShader = std::string("struct PSInput\n\
         {\n\
@@ -100,6 +99,8 @@ std::string tmp_PixelShader = ori_PixelShader;
 std::string used_PixelShader = ori_PixelShader;
 std::string tmp_PixelShader2 = ori_PixelShader;
 std::string used_PixelShader2 = ori_PixelShader;
+std::string tmp_imgfilename = std::string("input.jpg                                                    ");
+std::string used_imgfilename = std::string("input.jpg                                                   ");
 
 struct MessageCallback : public nvrhi::IMessageCallback
 {
@@ -344,6 +345,8 @@ HRESULT InitD3D(HWND OutputWindow, GLFWwindow *window)
 
     nvrhiDevice = nvrhi::d3d11::createDevice(deviceDesc);
 
+    Img_Loader.bindDevice(nvrhiDevice);
+
     nvrhi::RefCountPtr<ID3D11Texture2D> pBackBuffer = NULL;
     hr = g_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
     if(FAILED(hr))
@@ -446,51 +449,16 @@ auto callback_resize(ImGuiInputTextCallbackData* data) -> int
 
 void Render()
 {
-    
+    commandList = nvrhiDevice->createCommandList();
+    if (imagechanged) {
+        imagechanged = false;
+        Img_Loader.bindCmdList(commandList);
+        Img_Loader.loadImage(used_imgfilename.c_str());
+    }
+    nvrhi::TextureHandle myTexture = Img_Loader.getTexture();
+
     int tmp = (bagacounter / 100 + 1)%10;
     int tmpinv = 10 - tmp;
-    //used_PixelShader.replace(318, 1, std::to_string(tmp));
-    //used_PixelShader.replace(367, 1, std::to_string(tmpinv));
-    
-
-    const unsigned char* pixelsdata;
-    int imgwidth,imgheight;
-    //UINT64 imageRowPitch = LoadImage(myTexture, pixelsdata, imgwidth,imgheight);
-    //if (shaderchanged) {
-    int loadwidth, loadheight, loadchannels;
-    //stbi_set_flip_vertically_on_load(true);
-    pixelsdata = stbi_load("input.jpg", &loadwidth, &loadheight, &loadchannels,  4);
-    if (!pixelsdata) {
-    printf("Failed to load image!\n");
-    }
-    printf("load image w:%d, h:%d\n",loadwidth,loadheight);
-    UINT64 imageRowPitch = UINT64(loadwidth) * 4;
-    if (loadchannels != 4)
-    {
-        printf("image channel mismatce.\n");
-    }
-
-     // texture to show
-    auto showImgtextureDesc = nvrhi::TextureDesc()
-    .setDimension(nvrhi::TextureDimension::Texture2D)
-    .setFormat(nvrhi::Format::RGBA8_UNORM)
-    .setWidth(loadwidth)
-    .setHeight(loadheight)
-    .setIsRenderTarget(false)
-    .setDebugName("show texture Image")
-    .setIsUAV(true);
-    showImgtextureDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
-
-    nvrhi::TextureHandle myTexture = nvrhiDevice->createTexture(showImgtextureDesc);
-    
-    
-    //}
-    // commandList2= nvrhiDevice->createCommandList();
-
-    // commandList2->open();
-    // commandList2->writeTexture(myTexture, 0, 0, pixels,640*4);
-    // commandList2->close();
-    // nvrhiDevice->executeCommandList(commandList2);
 
     nvrhi::BindingLayoutDesc layoutDesc;
     layoutDesc.visibility = nvrhi::ShaderType::Pixel;
@@ -535,27 +503,6 @@ void Render()
         graphicsPipeline = nvrhiDevice->createGraphicsPipeline(pipelineDesc, framebuffer);
         // float clearColor[4] = {0.0f, 0.0f, 0.7f, 1.0f};
         // g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, clearColor);
-    }else if (shaderchanged2)
-    {
-        HRESULT hrr = CreateShaderFromStrint(ptrvertexShader2, ptrpixelShader2, used_PixelShader2);
-        shaderchanged2 = false;
-   
-    
-    auto pipelineDesc = nvrhi::GraphicsPipelineDesc()
-    .setPrimType(nvrhi::PrimitiveType::TriangleStrip)
-    .setInputLayout(inputLayout)
-    .setVertexShader(ptrvertexShader2)
-    .addBindingLayout(bindingLayout)
-    .setPixelShader(ptrpixelShader);
-    pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
-    pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
-    pipelineDesc.renderState.depthStencilState.stencilEnable = false;
-    pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
-    
-
-    graphicsPipeline2 = nvrhiDevice->createGraphicsPipeline(pipelineDesc, framebuffer);
-    // float clearColor[4] = {0.0f, 0.0f, 0.7f, 1.0f};
-    // g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, clearColor);
     } else {
         auto pipelineDesc = nvrhi::GraphicsPipelineDesc()
         .setPrimType(nvrhi::PrimitiveType::TriangleStrip)
@@ -572,7 +519,7 @@ void Render()
         graphicsPipeline = nvrhiDevice->createGraphicsPipeline(pipelineDesc, framebuffer);
     }
     
-    commandList= nvrhiDevice->createCommandList();
+    
     commandList->open();
     commandList->clearTextureFloat(swapChainTexture, nvrhi::AllSubresources, nvrhi::Color{  0.0f, 0.0f, 0.7f, 1.0f });
     // Draw our geometry
@@ -588,8 +535,6 @@ void Render()
 
     commandList->writeBuffer(vertexBuffer, g_Vertices, sizeof(g_Vertices));
     //if(shaderchanged) {
-        commandList->writeTexture(myTexture, 0, 0, pixelsdata, imageRowPitch,imageRowPitch*loadheight);
-        printf("write texture cmd recorded");
     //}
     // auto bindingSetDesc = nvrhi::BindingSetDesc();
 
@@ -600,14 +545,6 @@ void Render()
         .setPipeline(graphicsPipeline)
         .setFramebuffer(framebuffer)
         .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(nvrhi::Viewport(0.0f,400.0f, 0.0f,300.f,0.0f,1.0f)))
-        .addBindingSet(bindingSet)
-        .addVertexBuffer({vertexBuffer,0,0});
-
-     // Clear the primary render target
-    auto graphicsState2 = nvrhi::GraphicsState()
-        .setPipeline(graphicsPipeline2)
-        .setFramebuffer(framebuffer)
-        .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(nvrhi::Viewport(0.f,400.f, 301.f,600.f,0.0f,1.0f)))
         .addBindingSet(bindingSet)
         .addVertexBuffer({vertexBuffer,0,0});
 
@@ -629,6 +566,13 @@ void Render()
     //commandList->close();
     //nvrhiDevice->executeCommandList(commandList);
 
+    auto graphicsState2 = nvrhi::GraphicsState()
+        .setPipeline(graphicsPipeline)
+        .setFramebuffer(framebuffer)
+        .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(nvrhi::Viewport(0.0f,400.0f, 301.0f,600.f,0.0f,1.0f)))
+        .addBindingSet(bindingSet)
+        .addVertexBuffer({vertexBuffer,0,0});
+
     commandList->setGraphicsState(graphicsState2);
 
     drawArguments = nvrhi::DrawArguments()
@@ -639,10 +583,10 @@ void Render()
     nvrhiDevice->executeCommandList(commandList);
 
     //ImGui::End();
-     //ImGui::DockSpaceOverViewport(ImGui::GetMainViewport()->ID);
+    //ImGui::DockSpaceOverViewport(ImGui::GetMainViewport()->ID);
     bool show_another_window = true;
     ImGui::Begin("PS shader Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-    ImGui::InputTextMultiline("Hello", tmp_PixelShader.data(), tmp_PixelShader.size(), ImVec2(600, 300), ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackResize,
+    ImGui::InputTextMultiline("PS Shader", tmp_PixelShader.data(), tmp_PixelShader.size(), ImVec2(600, 300), ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackResize,
     callback_resize,
     &tmp_PixelShader);
     if (ImGui::Button("Update Shader"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
@@ -650,16 +594,16 @@ void Render()
         used_PixelShader = tmp_PixelShader;
         shaderchanged = true;
     }
-    ImGui::End();
-    bool show_window = true;
-    ImGui::Begin("PS shader Window2", &show_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-    ImGui::InputTextMultiline("Hello", tmp_PixelShader2.data(), tmp_PixelShader2.size(), ImVec2(600, 300), ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackResize,
+    //ImGui::End();
+    //bool show_window = true;
+    //ImGui::Begin("Input Image Window", &show_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+    ImGui::InputTextMultiline("File Name", tmp_imgfilename.data(), tmp_imgfilename.size(), ImVec2(600, 300), ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackResize,
     callback_resize,
-    &tmp_PixelShader2);
-    if (ImGui::Button("Update Shader"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+    &tmp_imgfilename);
+    if (ImGui::Button("Update Image"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
     {    
-        used_PixelShader2 = tmp_PixelShader2;
-        shaderchanged2 = true;
+        used_imgfilename = tmp_imgfilename;
+        imagechanged = true;
     }
     ImGui::End();
 
