@@ -24,10 +24,7 @@
 
 class ImgLoader_Streamer {
 public:
-    ImgLoader_Streamer(){
-        
-
-    };
+    ImgLoader_Streamer(){}
 
     void bindCmdList(nvrhi::CommandListHandle in_commandList) {
         this->commandList = in_commandList;
@@ -38,6 +35,7 @@ public:
     }
 
     void loadImage(const char* filename){
+        tmp_imgfilename = filename;
         this->pixelsdata = stbi_load(filename, &this->loadwidth, &this->loadheight, &this->loadchannels,  4);
         if (!pixelsdata) {
             printf("Failed to load image!\n");
@@ -75,6 +73,24 @@ public:
         return myTexture;
     }
 
+    bool showMenuWindow(std::string &used_imgfilename) {
+        bool show_window = true;
+        bool imagechanged = false;
+        ImGui::Begin("Input Image Window",&show_window, ImGuiWindowFlags_NoDocking);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+        if (!show_window)
+        {
+            printf("error showing window");
+        }
+        ImGui::InputText("File Name", tmp_imgfilename.data(), 100);
+        if (ImGui::Button("Update Image"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+        {    
+            used_imgfilename = tmp_imgfilename;
+            imagechanged = true;
+        }
+        ImGui::End();
+        return imagechanged;
+    }
+
 private:
     const unsigned char* pixelsdata;
     int loadwidth, loadheight, loadchannels;
@@ -84,6 +100,8 @@ private:
 
     nvrhi::CommandListHandle commandList;
     nvrhi::DeviceHandle nvrhiDevice;
+
+    std::string tmp_imgfilename;
 };
     
     

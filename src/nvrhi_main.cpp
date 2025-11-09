@@ -15,6 +15,7 @@
 #include "../bindings/imgui_impl_dx11.h"
 
 #include "ImgLoad_streamer.h"
+#include "Shader_streamer.h"
 
 struct Vertex {
     float position[3];
@@ -51,11 +52,22 @@ nvrhi::ShaderHandle ptrvertexShader = nullptr;
 nvrhi::ShaderHandle ptrpixelShader = nullptr;
 
 ImgLoader_Streamer Img_Loader{};
+ComputeShader_Streamer CS_Shader{};
 
 std::string inputstr;
 
 bool shaderchanged = false;
 bool imagechanged = true;
+
+std::string computeCS = std::string("StructuredBuffer<uint32_t> Buffer0 : register(t0);\n\
+        RWStructuredBuffer<uint32_t> BufferOut : register(u0);\n\
+        \n\
+        [numthreads(2, 2, 1)]\n\
+        void CSMain( uint3 DTid : SV_DispatchThreadID )\n\
+        {\n\
+        BufferOut[DTid.x] = Buffer0[(DTid.x + 1)%2];\n\
+        }\0                                                                                        ");
+
 
 std::string ori_PixelShader = std::string("struct PSInput\n\
         {\n\
@@ -99,8 +111,7 @@ std::string tmp_PixelShader = ori_PixelShader;
 std::string used_PixelShader = ori_PixelShader;
 std::string tmp_PixelShader2 = ori_PixelShader;
 std::string used_PixelShader2 = ori_PixelShader;
-std::string tmp_imgfilename = std::string("input.jpg                                                    ");
-std::string used_imgfilename = std::string("input.jpg                                                   ");
+std::string used_imgfilename = std::string("./Release/input.jpg                                                   ");
 
 struct MessageCallback : public nvrhi::IMessageCallback
 {
@@ -136,25 +147,6 @@ private:
 	uint8_t MinLogLevel;
 };
 
-UINT64 LoadImage(nvrhi::TextureHandle& myTexture, unsigned char* pixels,int & wid, int & hei) 
-{
-    int width, height, channels;
-    stbi_set_flip_vertically_on_load(true);
-    pixels = stbi_load("input.png", &width, &height, &channels,  4);
-    if (!pixels) {
-    printf("Failed to load image!\n");
-    }
-    printf("load image w:%d, h:%d\n",width,height);
-    UINT64 imageRowPitch = UINT64(width) * 4;
-    wid= width;
-    hei  = height;
-    if (channels != 4)
-    {
-        printf("image channel mismatce.\n");
-    }
-    
-    return imageRowPitch;
-}
 
 
 HRESULT CreateShaderFromStrint(nvrhi::ShaderHandle& ptrvertexShader,nvrhi::ShaderHandle& ptrpixelShader, std::string g_PixelShader)
@@ -346,6 +338,7 @@ HRESULT InitD3D(HWND OutputWindow, GLFWwindow *window)
     nvrhiDevice = nvrhi::d3d11::createDevice(deviceDesc);
 
     Img_Loader.bindDevice(nvrhiDevice);
+    CS_Shader.bindDevice(nvrhiDevice);
 
     nvrhi::RefCountPtr<ID3D11Texture2D> pBackBuffer = NULL;
     hr = g_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
@@ -455,7 +448,11 @@ void Render()
         Img_Loader.bindCmdList(commandList);
         Img_Loader.loadImage(used_imgfilename.c_str());
     }
-    nvrhi::TextureHandle myTexture = Img_Loader.getTexture();
+    nvrhi::TextureHandle middleTexture = Img_Loader.getTexture();
+    CS_Shader.bindCmdList(commandList);
+    CS_Shader.bindTexture(middleTexture, 1);
+    nvrhi::TextureHandle myTexture = CS_Shader.getOutTexture();
+    //CS_Shader.runComputeShader();
 
     int tmp = (bagacounter / 100 + 1)%10;
     int tmpinv = 10 - tmp;
@@ -585,7 +582,7 @@ void Render()
     //ImGui::End();
     //ImGui::DockSpaceOverViewport(ImGui::GetMainViewport()->ID);
     bool show_another_window = true;
-    ImGui::Begin("PS shader Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+    ImGui::Begin("PS shader Window", &show_another_window, ImGuiWindowFlags_NoDocking);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
     ImGui::InputTextMultiline("PS Shader", tmp_PixelShader.data(), tmp_PixelShader.size(), ImVec2(600, 300), ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackResize,
     callback_resize,
     &tmp_PixelShader);
@@ -594,22 +591,12 @@ void Render()
         used_PixelShader = tmp_PixelShader;
         shaderchanged = true;
     }
-    //ImGui::End();
-    //bool show_window = true;
-    //ImGui::Begin("Input Image Window", &show_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-    ImGui::InputTextMultiline("File Name", tmp_imgfilename.data(), tmp_imgfilename.size(), ImVec2(600, 300), ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackResize,
-    callback_resize,
-    &tmp_imgfilename);
-    if (ImGui::Button("Update Image"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-    {    
-        used_imgfilename = tmp_imgfilename;
-        imagechanged = true;
-    }
     ImGui::End();
 
+    imagechanged = Img_Loader.showMenuWindow(used_imgfilename);
+    CS_Shader.showMenuWindow();
+
     ImGui::Render();
-
-
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
     
 
@@ -618,11 +605,12 @@ void Render()
     // nvrhiDevice->executeCommandList(commandList);
     // ImGui::End();
     //ImGui::Render();
+    ImGui::UpdatePlatformWindows();
+    ImGui::RenderPlatformWindowsDefault();
     
     g_pSwapChain->Present(0,0);
 
-    ImGui::UpdatePlatformWindows();
-    ImGui::RenderPlatformWindowsDefault();
+    
 }
 
 
