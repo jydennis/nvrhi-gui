@@ -451,8 +451,9 @@ void Render()
     nvrhi::TextureHandle middleTexture = Img_Loader.getTexture();
     CS_Shader.bindCmdList(commandList);
     CS_Shader.bindTexture(middleTexture, 1);
+    
     nvrhi::TextureHandle myTexture = CS_Shader.getOutTexture();
-    //CS_Shader.runComputeShader();
+    CS_Shader.runComputeShader();
 
     int tmp = (bagacounter / 100 + 1)%10;
     int tmpinv = 10 - tmp;
