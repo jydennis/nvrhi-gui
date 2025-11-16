@@ -39,8 +39,8 @@ public:
         thread_z(thread_cnt) {
 
         used_ComputeShader = std::string("\
-        RWTexture2D<uint> BufferOut : register(u0);\n\
-        RWTexture2D<uint> Buffer0 : register(u1);\n\
+        RWTexture2D<unorm float4> BufferOut : register(u0);\n\
+        Texture2D<unorm float4> Buffer0 : register(t1);\n\
         \n\
         [numthreads(32, 32, 1)]\n\
         void CSMain( uint3 DTid : SV_DispatchThreadID )\n\
@@ -113,7 +113,7 @@ public:
         for (int i = 1; i <= textureList.size(); i++ ) {
             if(textureValidList[i]) {
             //printf("tex %d \n",i);
-            layoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(i));
+            layoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(i));
             }
         }
 
@@ -129,7 +129,7 @@ public:
         bindingDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_UAV(0, this->outTexUAV));
         for (int i = 1; i <= textureList.size(); i++ ) {
             if (textureValidList[i]){
-            bindingDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_UAV(i, textureList[i]));
+            bindingDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(i, textureList[i]));
             }
         }
 
@@ -152,7 +152,7 @@ public:
 
         commandList->setComputeState(ComputeState);
         commandList->setTextureState(this->outTexUAV, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess); //barrier
-
+        commandList->setTextureState(this->textureList[1], nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource); //barrier
         // 例如 16x16 的线程组
         commandList->dispatch(thread_w, thread_h, thread_z);
 
