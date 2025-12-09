@@ -10,6 +10,7 @@
 #include <GLFW/glfw3native.h>
 
 #include "imgui.h"
+#include <algorithm>
 //#include "../bindings/imgui_impl_win32.h"
 #include "../bindings/imgui_impl_glfw.h"
 #include "../bindings/imgui_impl_dx11.h"
@@ -58,6 +59,8 @@ std::string inputstr;
 
 bool shaderchanged = false;
 bool imagechanged = true;
+
+float zoom = 0.0f;
 
 std::string computeCS = std::string("StructuredBuffer<uint32_t> Buffer0 : register(t0);\n\
         RWStructuredBuffer<uint32_t> BufferOut : register(u0);\n\
@@ -554,7 +557,23 @@ void Render()
      ImGui::NewFrame();
         ImGui::DockSpaceOverViewport(ImGui::GetMainViewport()->ID);
 
-   
+    //ImGuiIO 中的 MouseWheel 变量是在 ImGui_ImplGlfw_NewFrame() 之前通过回调函数累积的，并在 ImGui_ImplGlfw_NewFrame() 调用时将其重置为零。    
+    ImGuiIO& io = ImGui::GetIO();
+    float wheel = io.MouseWheel;
+    if (wheel != 0.0f)
+    {
+        printf("wheel %f,", wheel);
+        float zoomFactor = 1.0f + wheel * 0.1f;  // 0.1 可调节缩放速度
+        zoom *= zoomFactor;
+
+        // 阻止 zoom 变成负数或过小
+        zoom = std::max(zoom, 0.05f);
+
+        float w = 400;
+        float h = 300;
+
+        //Matrix4 proj = Matrix4::Ortho(0, w / zoom, h / zoom, 0, -1, 1);
+    }
 
     auto drawArguments = nvrhi::DrawArguments()
         .setVertexCount(4);
@@ -637,10 +656,9 @@ int main()
     glfwShowWindow(window);
     shaderchanged = true;
     while(!glfwWindowShouldClose(window)) {
-       
         Render();
         glfwPollEvents();
-
+       
 
         
     }
