@@ -60,7 +60,7 @@ std::string inputstr;
 bool shaderchanged = false;
 bool imagechanged = true;
 
-float zoom = 0.0f;
+float zoom = 1.0f;
 
 std::string computeCS = std::string("StructuredBuffer<uint32_t> Buffer0 : register(t0);\n\
         RWStructuredBuffer<uint32_t> BufferOut : register(u0);\n\
@@ -156,7 +156,12 @@ HRESULT CreateShaderFromStrint(nvrhi::ShaderHandle& ptrvertexShader,nvrhi::Shade
 {
     HRESULT hr = S_OK;
     // Assume the shaders are included as C headers; they could just as well be loaded from files.
-    auto g_VertexShader = std::string("struct VSInput\
+    auto g_VertexShader = std::string("\
+        cbuffer FrameConstants: register(b0)\
+        {\
+          float3 zoomMatrix;\
+        };\
+        struct VSInput\
         {\
             float3 position: POSITION;\
             float3 color: COLOR;\
@@ -171,7 +176,7 @@ HRESULT CreateShaderFromStrint(nvrhi::ShaderHandle& ptrvertexShader,nvrhi::Shade
         VSOutput Main(VSInput input)\
         {\
             VSOutput output = (VSOutput)0;\
-            output.position = float4(input.position, 1.0);\
+            output.position = float4(input.position*zoomMatrix, 1.0);\
             output.color = input.color;\
             output.uv = input.uv;\
             return output;\
@@ -461,11 +466,18 @@ void Render()
     int tmp = (bagacounter / 100 + 1)%10;
     int tmpinv = 10 - tmp;
 
+    auto constantBufferDesc = nvrhi::BufferDesc()
+    .setByteSize(sizeof(float) * 3) // stores one matrix
+    .setIsConstantBuffer(true);
+
+    nvrhi::BufferHandle constbuf = nvrhiDevice->createBuffer(constantBufferDesc);
+
     nvrhi::BindingLayoutDesc layoutDesc;
-    layoutDesc.visibility = nvrhi::ShaderType::Pixel;
+    layoutDesc.visibility = nvrhi::ShaderType::AllGraphics;
     layoutDesc.bindings = {
         nvrhi::BindingLayoutItem::Texture_SRV(0),  // slot 0 对应上面的 binding
-         nvrhi::BindingLayoutItem::Sampler(0)       // s1
+         nvrhi::BindingLayoutItem::Sampler(0),       // s1
+         nvrhi::BindingLayoutItem::VolatileConstantBuffer(0) // constant buffer
     };
     nvrhi::BindingLayoutHandle bindingLayout = nvrhiDevice->createBindingLayout(layoutDesc);
 
@@ -478,7 +490,8 @@ void Render()
     nvrhi::BindingSetDesc bindingSetDesc;
     bindingSetDesc.bindings = {
         nvrhi::BindingSetItem::Texture_SRV(0, myTexture),  // slot = 0
-        nvrhi::BindingSetItem::Sampler(0, sampler)
+        nvrhi::BindingSetItem::Sampler(0, sampler),
+        nvrhi::BindingSetItem::ConstantBuffer(0, constbuf)
     };
     nvrhi::BindingSetHandle bindingSet = nvrhiDevice->createBindingSet(bindingSetDesc, bindingLayout);
 
@@ -534,6 +547,8 @@ void Render()
 
     nvrhi::BufferHandle vertexBuffer  = nvrhiDevice->createBuffer(vertexBufferDesc);
 
+    float zoomMatrix[3] = {zoom,zoom,1.0f};
+    commandList->writeBuffer(constbuf, zoomMatrix, sizeof(zoomMatrix));
     commandList->writeBuffer(vertexBuffer, g_Vertices, sizeof(g_Vertices));
     //if(shaderchanged) {
     //}
@@ -568,7 +583,7 @@ void Render()
 
         // 阻止 zoom 变成负数或过小
         zoom = std::max(zoom, 0.05f);
-
+        printf("zoom fact %f,\n", zoom);
         float w = 400;
         float h = 300;
 
