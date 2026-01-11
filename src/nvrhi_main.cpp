@@ -114,7 +114,7 @@ std::string tmp_PixelShader = ori_PixelShader;
 std::string used_PixelShader = ori_PixelShader;
 std::string tmp_PixelShader2 = ori_PixelShader;
 std::string used_PixelShader2 = ori_PixelShader;
-std::string used_imgfilename = std::string("./Release/input.jpg                                                   ");
+std::string used_imgfilename = std::string("./Release/input.png                                                   ");
 
 struct MessageCallback : public nvrhi::IMessageCallback
 {

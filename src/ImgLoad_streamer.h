@@ -37,9 +37,12 @@ public:
     void loadImage(const char* filename){
         tmp_imgfilename = filename;
         this->pixelsdata = stbi_load(filename, &this->loadwidth, &this->loadheight, &this->loadchannels,  4);
+
         if (!pixelsdata) {
-            printf("Failed to load image!\n");
-            return;
+            printf("Fail to load image.\n");
+            this->loadheight = 32;
+            this->loadwidth = 32;
+            pixelsdata = new unsigned char[UINT64(this->loadheight) * UINT64(this->loadwidth) * 4]();
         } else {
             printf("load image w:%d, h:%d\n",this->loadwidth,this->loadheight);
         }
@@ -61,8 +64,9 @@ public:
         showImgtextureDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 
         myTexture = nvrhiDevice->createTexture(showImgtextureDesc);
-        
+
         this->imageRowPitch = UINT64(this->loadwidth) * 4;
+
         commandList->open();
         commandList->writeTexture(myTexture, 0, 0, pixelsdata, imageRowPitch,imageRowPitch*loadheight);
         commandList->close();
