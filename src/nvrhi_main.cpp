@@ -54,8 +54,14 @@ ID3D11RenderTargetView* g_RTV = nullptr;
 nvrhi::ShaderHandle ptrvertexShader = nullptr;
 nvrhi::ShaderHandle ptrpixelShader = nullptr;
 
-ImgLoader_Streamer Img_Loader{};
-ComputeShader_Streamer CS_Shader{};
+ImgLoader_Streamer Img_Loader1{};
+ImgLoader_Streamer Img_Loader2{};
+ImgLoader_Streamer Img_Loader3{};
+ImgLoader_Streamer Img_Loader4{};
+ComputeShader_Streamer CS_Shader1{};
+ComputeShader_Streamer CS_Shader2{};
+ComputeShader_Streamer CS_Shader3{};
+ComputeShader_Streamer CS_Shader4{};
 
 std::string inputstr;
 
@@ -116,7 +122,10 @@ std::string tmp_PixelShader = ori_PixelShader;
 std::string used_PixelShader = ori_PixelShader;
 std::string tmp_PixelShader2 = ori_PixelShader;
 std::string used_PixelShader2 = ori_PixelShader;
-std::string used_imgfilename = std::string("./Release/input.png                                                   ");
+std::string used_imgfilename1 = std::string("./Release/input.png                                                   ");
+std::string used_imgfilename2 = std::string("./Release/input.png                                                   ");
+std::string used_imgfilename3 = std::string("./Release/input.png                                                   ");
+std::string used_imgfilename4 = std::string("./Release/input.png                                                   ");
 
 struct MessageCallback : public nvrhi::IMessageCallback
 {
@@ -347,8 +356,14 @@ HRESULT InitD3D(HWND OutputWindow, GLFWwindow *window)
 
     nvrhiDevice = nvrhi::d3d11::createDevice(deviceDesc);
 
-    Img_Loader.bindDevice(nvrhiDevice);
-    CS_Shader.bindDevice(nvrhiDevice);
+    Img_Loader1.bindDevice(nvrhiDevice);
+    Img_Loader2.bindDevice(nvrhiDevice);
+    Img_Loader3.bindDevice(nvrhiDevice);
+    Img_Loader4.bindDevice(nvrhiDevice);
+    CS_Shader1.bindDevice(nvrhiDevice);
+    CS_Shader2.bindDevice(nvrhiDevice);
+    CS_Shader3.bindDevice(nvrhiDevice);
+    CS_Shader4.bindDevice(nvrhiDevice);
 
     nvrhi::RefCountPtr<ID3D11Texture2D> pBackBuffer = NULL;
     hr = g_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
@@ -456,15 +471,38 @@ void Render()
     commandList = nvrhiDevice->createCommandList();
     if (imagechanged) {
         imagechanged = false;
-        Img_Loader.bindCmdList(commandList);
-        Img_Loader.loadImage(used_imgfilename.c_str());
+        Img_Loader1.bindCmdList(commandList);
+        Img_Loader1.loadImage(used_imgfilename1.c_str());
+        Img_Loader2.bindCmdList(commandList);
+        Img_Loader2.loadImage(used_imgfilename2.c_str());
+        Img_Loader3.bindCmdList(commandList);
+        Img_Loader3.loadImage(used_imgfilename3.c_str());
+        Img_Loader4.bindCmdList(commandList);
+        Img_Loader4.loadImage(used_imgfilename4.c_str());
     }
-    nvrhi::TextureHandle middleTexture = Img_Loader.getTexture();
-    CS_Shader.bindCmdList(commandList);
-    CS_Shader.bindTexture(middleTexture, 1);
-    
-    nvrhi::TextureHandle myTexture = CS_Shader.getOutTexture();
-    CS_Shader.runComputeShader();
+    nvrhi::TextureHandle middleTexture1 = Img_Loader1.getTexture();
+    CS_Shader1.bindCmdList(commandList);
+    CS_Shader1.bindTexture(middleTexture1, 1);
+    nvrhi::TextureHandle myTexture1 = CS_Shader1.getOutTexture();
+    CS_Shader1.runComputeShader();
+
+    nvrhi::TextureHandle middleTexture2 = Img_Loader2.getTexture();
+    CS_Shader2.bindCmdList(commandList);
+    CS_Shader2.bindTexture(middleTexture2, 1);
+    nvrhi::TextureHandle myTexture2 = CS_Shader2.getOutTexture();
+    CS_Shader2.runComputeShader();
+
+    nvrhi::TextureHandle middleTexture3 = Img_Loader3.getTexture();
+    CS_Shader3.bindCmdList(commandList);
+    CS_Shader3.bindTexture(middleTexture3, 1);
+    nvrhi::TextureHandle myTexture3 = CS_Shader3.getOutTexture();
+    CS_Shader3.runComputeShader();
+
+    nvrhi::TextureHandle middleTexture4 = Img_Loader4.getTexture();
+    CS_Shader4.bindCmdList(commandList);
+    CS_Shader4.bindTexture(middleTexture4, 1);
+    nvrhi::TextureHandle myTexture4 = CS_Shader4.getOutTexture();
+    CS_Shader4.runComputeShader();
 
     int tmp = (bagacounter / 100 + 1)%10;
     int tmpinv = 10 - tmp;
@@ -490,13 +528,37 @@ void Render()
 
     nvrhi::SamplerHandle sampler = nvrhiDevice->createSampler(sampDesc);
 
-    nvrhi::BindingSetDesc bindingSetDesc;
-    bindingSetDesc.bindings = {
-        nvrhi::BindingSetItem::Texture_SRV(0, myTexture),  // slot = 0
+    nvrhi::BindingSetDesc bindingSetDesc1;
+    bindingSetDesc1.bindings = {
+        nvrhi::BindingSetItem::Texture_SRV(0, myTexture1),  // slot = 0
         nvrhi::BindingSetItem::Sampler(0, sampler),
         nvrhi::BindingSetItem::ConstantBuffer(0, constbuf)
     };
-    nvrhi::BindingSetHandle bindingSet = nvrhiDevice->createBindingSet(bindingSetDesc, bindingLayout);
+    nvrhi::BindingSetHandle bindingSet1 = nvrhiDevice->createBindingSet(bindingSetDesc1, bindingLayout);
+
+    nvrhi::BindingSetDesc bindingSetDesc2;
+    bindingSetDesc2.bindings = {
+        nvrhi::BindingSetItem::Texture_SRV(0, myTexture2),  // slot = 0
+        nvrhi::BindingSetItem::Sampler(0, sampler),
+        nvrhi::BindingSetItem::ConstantBuffer(0, constbuf)
+    };
+    nvrhi::BindingSetHandle bindingSet2 = nvrhiDevice->createBindingSet(bindingSetDesc2, bindingLayout);
+
+    nvrhi::BindingSetDesc bindingSetDesc3;
+    bindingSetDesc3.bindings = {
+        nvrhi::BindingSetItem::Texture_SRV(0, myTexture3),  // slot = 0
+        nvrhi::BindingSetItem::Sampler(0, sampler),
+        nvrhi::BindingSetItem::ConstantBuffer(0, constbuf)
+    };
+    nvrhi::BindingSetHandle bindingSet3 = nvrhiDevice->createBindingSet(bindingSetDesc3, bindingLayout);
+
+    nvrhi::BindingSetDesc bindingSetDesc4;
+    bindingSetDesc4.bindings = {
+        nvrhi::BindingSetItem::Texture_SRV(0, myTexture4),  // slot = 0
+        nvrhi::BindingSetItem::Sampler(0, sampler),
+        nvrhi::BindingSetItem::ConstantBuffer(0, constbuf)
+    };
+    nvrhi::BindingSetHandle bindingSet4 = nvrhiDevice->createBindingSet(bindingSetDesc4, bindingLayout);
 
 
     bagacounter++;
@@ -565,7 +627,7 @@ void Render()
         .setPipeline(graphicsPipeline)
         .setFramebuffer(framebuffer)
         .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(nvrhi::Viewport(0.0f,400.0f, 0.0f,300.f,0.0f,1.0f)))
-        .addBindingSet(bindingSet)
+        .addBindingSet(bindingSet1)
         .addVertexBuffer({vertexBuffer,0,0});
 
     commandList->setGraphicsState(graphicsState);
@@ -582,7 +644,7 @@ void Render()
         .setPipeline(graphicsPipeline)
         .setFramebuffer(framebuffer)
         .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(nvrhi::Viewport(0.0f,400.0f, 301.0f,600.f,0.0f,1.0f)))
-        .addBindingSet(bindingSet)
+        .addBindingSet(bindingSet2)
         .addVertexBuffer({vertexBuffer,0,0});
 
     commandList->setGraphicsState(graphicsState2);
@@ -596,7 +658,7 @@ void Render()
         .setPipeline(graphicsPipeline)
         .setFramebuffer(framebuffer)
         .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(nvrhi::Viewport(401.0f,800.0f, 0.0f,300.f,0.0f,1.0f)))
-        .addBindingSet(bindingSet)
+        .addBindingSet(bindingSet3)
         .addVertexBuffer({vertexBuffer,0,0});
 
     commandList->setGraphicsState(graphicsState3);
@@ -610,7 +672,7 @@ void Render()
         .setPipeline(graphicsPipeline)
         .setFramebuffer(framebuffer)
         .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(nvrhi::Viewport(401.0f,800.0f, 301.0f,600.f,0.0f,1.0f)))
-        .addBindingSet(bindingSet)
+        .addBindingSet(bindingSet4)
         .addVertexBuffer({vertexBuffer,0,0});
 
     commandList->setGraphicsState(graphicsState4);
@@ -664,8 +726,14 @@ void Render()
     }
     ImGui::End();
     
-    imagechanged = Img_Loader.showMenuWindow(used_imgfilename);
-    CS_Shader.showMenuWindow();
+    imagechanged = Img_Loader1.showMenuWindow(used_imgfilename1,1);
+    CS_Shader1.showMenuWindow();
+    imagechanged |= Img_Loader2.showMenuWindow(used_imgfilename2,2);
+    CS_Shader2.showMenuWindow();
+    imagechanged |= Img_Loader3.showMenuWindow(used_imgfilename3,3);
+    CS_Shader3.showMenuWindow();
+    imagechanged |= Img_Loader4.showMenuWindow(used_imgfilename4,4);
+    CS_Shader4.showMenuWindow();
     
     ImGui::Render();
     g_pImmediateContext->OMSetRenderTargets(1, &g_RTV, nullptr);

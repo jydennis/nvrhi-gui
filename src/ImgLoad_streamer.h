@@ -77,10 +77,12 @@ public:
         return myTexture;
     }
 
-    bool showMenuWindow(std::string &used_imgfilename) {
+    bool showMenuWindow(std::string &used_imgfilename,int idx) {
         bool show_window = true;
         bool imagechanged = false;
-        ImGui::Begin("Input Image Window",&show_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+        std::string texname = "Input Image Window";
+        texname += std::to_string(idx);
+        ImGui::Begin(texname.c_str() ,&show_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
         if (!show_window)
         {
             printf("error showing window");
@@ -106,6 +108,8 @@ private:
     nvrhi::DeviceHandle nvrhiDevice;
 
     std::string tmp_imgfilename;
+
+    int idx;
 };
     
     
