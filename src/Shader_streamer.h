@@ -174,7 +174,7 @@ public:
     void showMenuWindow() {
         bool show_window = true;
         
-        ImGui::Begin("Compute Shader Window",&show_window, ImGuiWindowFlags_NoDocking);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+        ImGui::Begin("Compute Shader Window",&show_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
         if (!show_window)
         {
             printf("error showing CS window");

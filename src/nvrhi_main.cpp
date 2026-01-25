@@ -49,6 +49,8 @@ nvrhi::GraphicsPipelineHandle graphicsPipeline2 =NULL;
 nvrhi::FramebufferHandle framebuffer=NULL;
 nvrhi::InputLayoutHandle inputLayout = NULL;
 
+ID3D11RenderTargetView* g_RTV = nullptr;
+
 nvrhi::ShaderHandle ptrvertexShader = nullptr;
 nvrhi::ShaderHandle ptrpixelShader = nullptr;
 
@@ -354,6 +356,7 @@ HRESULT InitD3D(HWND OutputWindow, GLFWwindow *window)
     {
         return hr;
     }
+    g_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &g_RTV);
     auto textureDesc = nvrhi::TextureDesc()
     .setDimension(nvrhi::TextureDimension::Texture2D)
     .setFormat(nvrhi::Format::RGBA8_UNORM)
@@ -535,6 +538,7 @@ void Render()
     
     
     commandList->open();
+    g_pImmediateContext->OMSetRenderTargets(1, &g_RTV, nullptr);
     commandList->clearTextureFloat(swapChainTexture, nvrhi::AllSubresources, nvrhi::Color{  0.0f, 0.0f, 0.7f, 1.0f });
     // Draw our geometry
 
@@ -566,30 +570,6 @@ void Render()
 
     commandList->setGraphicsState(graphicsState);
 
-     ImGui_ImplDX11_NewFrame();
-     //ImGui_ImplWin32_NewFrame();
-     ImGui_ImplGlfw_NewFrame();
-     ImGui::NewFrame();
-        ImGui::DockSpaceOverViewport(ImGui::GetMainViewport()->ID);
-
-    //ImGuiIO 中的 MouseWheel 变量是在 ImGui_ImplGlfw_NewFrame() 之前通过回调函数累积的，并在 ImGui_ImplGlfw_NewFrame() 调用时将其重置为零。    
-    ImGuiIO& io = ImGui::GetIO();
-    float wheel = io.MouseWheel;
-    if (wheel != 0.0f)
-    {
-        printf("wheel %f,", wheel);
-        float zoomFactor = 1.0f + wheel * 0.1f;  // 0.1 可调节缩放速度
-        zoom *= zoomFactor;
-
-        // 阻止 zoom 变成负数或过小
-        zoom = std::max(zoom, 0.05f);
-        printf("zoom fact %f,\n", zoom);
-        float w = 400;
-        float h = 300;
-
-        //Matrix4 proj = Matrix4::Ortho(0, w / zoom, h / zoom, 0, -1, 1);
-    }
-
     auto drawArguments = nvrhi::DrawArguments()
         .setVertexCount(4);
 
@@ -611,13 +591,69 @@ void Render()
         .setVertexCount(4);
 
     commandList->draw(drawArguments);
+
+    auto graphicsState3 = nvrhi::GraphicsState()
+        .setPipeline(graphicsPipeline)
+        .setFramebuffer(framebuffer)
+        .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(nvrhi::Viewport(401.0f,800.0f, 0.0f,300.f,0.0f,1.0f)))
+        .addBindingSet(bindingSet)
+        .addVertexBuffer({vertexBuffer,0,0});
+
+    commandList->setGraphicsState(graphicsState3);
+
+    drawArguments = nvrhi::DrawArguments()
+        .setVertexCount(4);
+
+    commandList->draw(drawArguments);
+
+    auto graphicsState4 = nvrhi::GraphicsState()
+        .setPipeline(graphicsPipeline)
+        .setFramebuffer(framebuffer)
+        .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(nvrhi::Viewport(401.0f,800.0f, 301.0f,600.f,0.0f,1.0f)))
+        .addBindingSet(bindingSet)
+        .addVertexBuffer({vertexBuffer,0,0});
+
+    commandList->setGraphicsState(graphicsState4);
+
+    drawArguments = nvrhi::DrawArguments()
+        .setVertexCount(4);
+
+    commandList->draw(drawArguments);
+
+    
     commandList->close();
     nvrhiDevice->executeCommandList(commandList);
 
+     ImGui_ImplDX11_NewFrame(); // dx11 is the rendering backend handling draw
+     //ImGui_ImplWin32_NewFrame();
+     ImGui_ImplGlfw_NewFrame(); // glfw is the platform backend handling io
+     ImGui::NewFrame();
+    //ImGui::DockSpaceOverViewport(ImGui::GetMainViewport()->ID);
+
+    //ImGuiIO 中的 MouseWheel 变量是在 ImGui_ImplGlfw_NewFrame() 之前通过回调函数累积的，并在 ImGui_ImplGlfw_NewFrame() 调用时将其重置为零。    
+    ImGuiIO& io = ImGui::GetIO();
+    float wheel = io.MouseWheel;
+    if (wheel != 0.0f)
+    {
+        printf("wheel %f,", wheel);
+        float zoomFactor = 1.0f + wheel * 0.1f;  // 0.1 可调节缩放速度
+        zoom *= zoomFactor;
+
+        // 阻止 zoom 变成负数或过小
+        zoom = std::max(zoom, 0.05f);
+        printf("zoom fact %f,\n", zoom);
+        float w = 400;
+        float h = 300;
+
+        //Matrix4 proj = Matrix4::Ortho(0, w / zoom, h / zoom, 0, -1, 1);
+    }
+
+    
+    
     //ImGui::End();
     //ImGui::DockSpaceOverViewport(ImGui::GetMainViewport()->ID);
     bool show_another_window = true;
-    ImGui::Begin("PS shader Window", &show_another_window, ImGuiWindowFlags_NoDocking);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+    ImGui::Begin("PS shader Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
     ImGui::InputTextMultiline("PS Shader", tmp_PixelShader.data(), tmp_PixelShader.size(), ImVec2(600, 300), ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackResize,
     callback_resize,
     &tmp_PixelShader);
@@ -627,24 +663,24 @@ void Render()
         shaderchanged = true;
     }
     ImGui::End();
-
+    
     imagechanged = Img_Loader.showMenuWindow(used_imgfilename);
     CS_Shader.showMenuWindow();
-
+    
     ImGui::Render();
+    g_pImmediateContext->OMSetRenderTargets(1, &g_RTV, nullptr);
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
     
-
     // commandList->close();
     // ImGui::Begin("The Triangle");
     // nvrhiDevice->executeCommandList(commandList);
     // ImGui::End();
     //ImGui::Render();
+    
     ImGui::UpdatePlatformWindows();
     ImGui::RenderPlatformWindowsDefault();
     
-    g_pSwapChain->Present(0,0);
-
+    g_pSwapChain->Present(1,0);
     
 }
 
@@ -673,8 +709,6 @@ int main()
     while(!glfwWindowShouldClose(window)) {
         Render();
         glfwPollEvents();
-       
-
         
     }
     ImGui_ImplDX11_Shutdown();
