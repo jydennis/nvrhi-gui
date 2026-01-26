@@ -58,6 +58,7 @@ public:
         .setFormat(nvrhi::Format::RGBA8_UNORM)
         .setWidth(loadwidth)
         .setHeight(loadheight)
+        .setSampleCount(1)
         .setIsRenderTarget(false)
         .setDebugName("show texture Image")
         .setIsUAV(true);
@@ -77,6 +78,10 @@ public:
         return myTexture;
     }
 
+    float getMSAAFactor() {
+        return std::pow(2, 3 - current);
+    }
+
     bool showMenuWindow(std::string &used_imgfilename,int idx) {
         bool show_window = true;
         bool imagechanged = false;
@@ -93,6 +98,15 @@ public:
             used_imgfilename = tmp_imgfilename;
             imagechanged = true;
         }
+        
+        const char* items[] = {
+            "1xMSAA",
+            "2xMSAA",
+            "4xMSAA",
+            "8xMSAA",
+        };
+
+        ImGui::Combo("Mode", &current, items, IM_ARRAYSIZE(items));
         ImGui::End();
         return imagechanged;
     }
@@ -110,6 +124,7 @@ private:
     std::string tmp_imgfilename;
 
     int idx;
+    int current = 0;
 };
     
     

@@ -69,6 +69,13 @@ bool shaderchanged = false;
 bool imagechanged = true;
 
 float zoom = 1.0f;
+float viewOffsetx = 0.0f;
+float viewOffsety = 0.0f;
+
+struct CameraBuffer {
+    float zoommatrix[4];
+    float offsetvec[2];
+} cambuffer1, cambuffer2, cambuffer3, cambuffer4;
 
 std::string computeCS = std::string("StructuredBuffer<uint32_t> Buffer0 : register(t0);\n\
         RWStructuredBuffer<uint32_t> BufferOut : register(u0);\n\
@@ -170,7 +177,8 @@ HRESULT CreateShaderFromStrint(nvrhi::ShaderHandle& ptrvertexShader,nvrhi::Shade
     auto g_VertexShader = std::string("\
         cbuffer FrameConstants: register(b0)\
         {\
-          float3 zoomMatrix;\
+          float4 zoomMatrix;\
+          float2 viewOffset;\
         };\
         struct VSInput\
         {\
@@ -187,7 +195,12 @@ HRESULT CreateShaderFromStrint(nvrhi::ShaderHandle& ptrvertexShader,nvrhi::Shade
         VSOutput Main(VSInput input)\
         {\
             VSOutput output = (VSOutput)0;\
-            output.position = float4(input.position*zoomMatrix, 1.0);\
+            input.position.x += 1.0f;\
+            input.position.y -= 1.0f;\
+            input.position *= zoomMatrix.xyz;\
+            input.position.x += viewOffset.x;\
+            input.position.y += viewOffset.y;\
+            output.position = float4(input.position, 1.0);\
             output.color = input.color;\
             output.uv = input.uv;\
             return output;\
@@ -375,6 +388,7 @@ HRESULT InitD3D(HWND OutputWindow, GLFWwindow *window)
     auto textureDesc = nvrhi::TextureDesc()
     .setDimension(nvrhi::TextureDimension::Texture2D)
     .setFormat(nvrhi::Format::RGBA8_UNORM)
+    .setSampleCount(1)
     .setWidth(640)
     .setHeight(480)
     .setIsRenderTarget(true)
@@ -508,10 +522,13 @@ void Render()
     int tmpinv = 10 - tmp;
 
     auto constantBufferDesc = nvrhi::BufferDesc()
-    .setByteSize(sizeof(float) * 3) // stores one matrix
+    .setByteSize( sizeof(cambuffer1)) // stores one matrix
     .setIsConstantBuffer(true);
 
-    nvrhi::BufferHandle constbuf = nvrhiDevice->createBuffer(constantBufferDesc);
+    nvrhi::BufferHandle constbuf1 = nvrhiDevice->createBuffer(constantBufferDesc);
+    nvrhi::BufferHandle constbuf2 = nvrhiDevice->createBuffer(constantBufferDesc);
+    nvrhi::BufferHandle constbuf3 = nvrhiDevice->createBuffer(constantBufferDesc);
+    nvrhi::BufferHandle constbuf4 = nvrhiDevice->createBuffer(constantBufferDesc);
 
     nvrhi::BindingLayoutDesc layoutDesc;
     layoutDesc.visibility = nvrhi::ShaderType::AllGraphics;
@@ -523,6 +540,9 @@ void Render()
     nvrhi::BindingLayoutHandle bindingLayout = nvrhiDevice->createBindingLayout(layoutDesc);
 
     nvrhi::SamplerDesc sampDesc;
+    sampDesc.minFilter = false;
+    sampDesc.magFilter = false;
+    sampDesc.mipFilter = false;   // 非常重要
     sampDesc.addressU = nvrhi::SamplerAddressMode::Wrap;
     sampDesc.addressV = nvrhi::SamplerAddressMode::Wrap;
 
@@ -532,7 +552,7 @@ void Render()
     bindingSetDesc1.bindings = {
         nvrhi::BindingSetItem::Texture_SRV(0, myTexture1),  // slot = 0
         nvrhi::BindingSetItem::Sampler(0, sampler),
-        nvrhi::BindingSetItem::ConstantBuffer(0, constbuf)
+        nvrhi::BindingSetItem::ConstantBuffer(0, constbuf1)
     };
     nvrhi::BindingSetHandle bindingSet1 = nvrhiDevice->createBindingSet(bindingSetDesc1, bindingLayout);
 
@@ -540,7 +560,7 @@ void Render()
     bindingSetDesc2.bindings = {
         nvrhi::BindingSetItem::Texture_SRV(0, myTexture2),  // slot = 0
         nvrhi::BindingSetItem::Sampler(0, sampler),
-        nvrhi::BindingSetItem::ConstantBuffer(0, constbuf)
+        nvrhi::BindingSetItem::ConstantBuffer(0, constbuf2)
     };
     nvrhi::BindingSetHandle bindingSet2 = nvrhiDevice->createBindingSet(bindingSetDesc2, bindingLayout);
 
@@ -548,7 +568,7 @@ void Render()
     bindingSetDesc3.bindings = {
         nvrhi::BindingSetItem::Texture_SRV(0, myTexture3),  // slot = 0
         nvrhi::BindingSetItem::Sampler(0, sampler),
-        nvrhi::BindingSetItem::ConstantBuffer(0, constbuf)
+        nvrhi::BindingSetItem::ConstantBuffer(0, constbuf3)
     };
     nvrhi::BindingSetHandle bindingSet3 = nvrhiDevice->createBindingSet(bindingSetDesc3, bindingLayout);
 
@@ -556,7 +576,7 @@ void Render()
     bindingSetDesc4.bindings = {
         nvrhi::BindingSetItem::Texture_SRV(0, myTexture4),  // slot = 0
         nvrhi::BindingSetItem::Sampler(0, sampler),
-        nvrhi::BindingSetItem::ConstantBuffer(0, constbuf)
+        nvrhi::BindingSetItem::ConstantBuffer(0, constbuf4)
     };
     nvrhi::BindingSetHandle bindingSet4 = nvrhiDevice->createBindingSet(bindingSetDesc4, bindingLayout);
 
@@ -613,8 +633,30 @@ void Render()
 
     nvrhi::BufferHandle vertexBuffer  = nvrhiDevice->createBuffer(vertexBufferDesc);
 
-    float zoomMatrix[3] = {zoom,zoom,1.0f};
-    commandList->writeBuffer(constbuf, zoomMatrix, sizeof(zoomMatrix));
+    cambuffer1.zoommatrix[0] = zoom * Img_Loader1.getMSAAFactor();
+    cambuffer1.zoommatrix[1] = zoom * Img_Loader1.getMSAAFactor();
+    cambuffer1.zoommatrix[2] = 1.0f;
+    cambuffer1.offsetvec[0]  = viewOffsetx;
+    cambuffer1.offsetvec[1]  = viewOffsety;
+    commandList->writeBuffer(constbuf1, &cambuffer1, sizeof(cambuffer1));
+    cambuffer2.zoommatrix[0] = zoom * Img_Loader2.getMSAAFactor();
+    cambuffer2.zoommatrix[1] = zoom * Img_Loader2.getMSAAFactor();
+    cambuffer2.zoommatrix[2] = 1.0f;
+    cambuffer2.offsetvec[0]  = viewOffsetx;
+    cambuffer2.offsetvec[1]  = viewOffsety;
+    commandList->writeBuffer(constbuf2, &cambuffer2, sizeof(cambuffer2));
+    cambuffer3.zoommatrix[0] = zoom * Img_Loader3.getMSAAFactor();
+    cambuffer3.zoommatrix[1] = zoom * Img_Loader3.getMSAAFactor();
+    cambuffer3.zoommatrix[2] = 1.0f;
+    cambuffer3.offsetvec[0]  = viewOffsetx;
+    cambuffer3.offsetvec[1]  = viewOffsety;
+    commandList->writeBuffer(constbuf3, &cambuffer3, sizeof(cambuffer3));
+    cambuffer4.zoommatrix[0] = zoom * Img_Loader4.getMSAAFactor();
+    cambuffer4.zoommatrix[1] = zoom * Img_Loader4.getMSAAFactor();
+    cambuffer4.zoommatrix[2] = 1.0f;
+    cambuffer4.offsetvec[0]  = viewOffsetx;
+    cambuffer4.offsetvec[1]  = viewOffsety;
+    commandList->writeBuffer(constbuf4, &cambuffer4, sizeof(cambuffer4));
     commandList->writeBuffer(vertexBuffer, g_Vertices, sizeof(g_Vertices));
     //if(shaderchanged) {
     //}
@@ -708,6 +750,13 @@ void Render()
         float h = 300;
 
         //Matrix4 proj = Matrix4::Ortho(0, w / zoom, h / zoom, 0, -1, 1);
+    }
+    if (!io.WantCaptureMouse && io.MouseDown[0] )   // 左键按住
+    {
+        ImVec2 d = io.MouseDelta;
+        viewOffsetx += (d.x)/400;
+        viewOffsety -= (d.y)/300;
+        printf("offset %f, %f \n", viewOffsetx, viewOffsety);
     }
 
     
