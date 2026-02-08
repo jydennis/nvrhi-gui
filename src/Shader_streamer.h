@@ -171,26 +171,23 @@ public:
 
 
 
-    void showMenuWindow() {
-        bool show_window = true;
-        
-        ImGui::Begin("Compute Shader Window",&show_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+    void showMenuWindow(int idx, bool show_window) {
         if (!show_window)
         {
             printf("error showing CS window");
         }
 
-        
-
-        ImGui::InputTextMultiline("CS Shader", tmp_ComputeShader.data(), 2000, ImVec2(600, 300), ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackResize,
+        std::string inputtext = "CS Shader "+std::to_string(idx);
+        std::string buttext = "Update Shader "+std::to_string(idx);
+        ImGui::InputTextMultiline(inputtext.c_str(), tmp_ComputeShader.data(), 2000, ImVec2(600, 300), ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackResize,
         callback_resize_txt,
         &tmp_ComputeShader);
-        if (ImGui::Button("Update Shader"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+        if (ImGui::Button(buttext.c_str()))                            // Buttons return true when clicked (most widgets return true when edited/activated)
         {    
             used_ComputeShader = tmp_ComputeShader;
             CSchanged = true;
         }
-        ImGui::End();
+        
     }
 private:
     HRESULT createShaderFromStrint(nvrhi::ShaderHandle& ptrComputeShader, std::string used_ComputeShader) {

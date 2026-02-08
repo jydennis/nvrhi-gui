@@ -774,15 +774,19 @@ void Render()
         shaderchanged = true;
     }
     ImGui::End();
-    
-    imagechanged = Img_Loader1.showMenuWindow(used_imgfilename1,1);
-    CS_Shader1.showMenuWindow();
-    imagechanged |= Img_Loader2.showMenuWindow(used_imgfilename2,2);
-    CS_Shader2.showMenuWindow();
-    imagechanged |= Img_Loader3.showMenuWindow(used_imgfilename3,3);
-    CS_Shader3.showMenuWindow();
-    imagechanged |= Img_Loader4.showMenuWindow(used_imgfilename4,4);
-    CS_Shader4.showMenuWindow();
+    std::string texname = "Input Image Window";
+    ImGui::Begin(texname.c_str() ,&show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+    imagechanged = Img_Loader1.showMenuWindow(used_imgfilename1,1,show_another_window);
+    imagechanged |= Img_Loader2.showMenuWindow(used_imgfilename2,2,show_another_window);
+    imagechanged |= Img_Loader3.showMenuWindow(used_imgfilename3,3,show_another_window);
+    imagechanged |= Img_Loader4.showMenuWindow(used_imgfilename4,4,show_another_window);
+    ImGui::End();
+    ImGui::Begin("Compute Shader Window",&show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+    CS_Shader1.showMenuWindow(1,show_another_window);
+    CS_Shader2.showMenuWindow(2,show_another_window);
+    CS_Shader3.showMenuWindow(3,show_another_window);
+    CS_Shader4.showMenuWindow(4,show_another_window);
+    ImGui::End();
     
     ImGui::Render();
     g_pImmediateContext->OMSetRenderTargets(1, &g_RTV, nullptr);

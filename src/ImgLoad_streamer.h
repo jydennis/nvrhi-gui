@@ -82,18 +82,18 @@ public:
         return std::pow(2, 3 - current);
     }
 
-    bool showMenuWindow(std::string &used_imgfilename,int idx) {
-        bool show_window = true;
+    bool showMenuWindow(std::string &used_imgfilename,int idx, bool show_window) {
+       
         bool imagechanged = false;
-        std::string texname = "Input Image Window";
-        texname += std::to_string(idx);
-        ImGui::Begin(texname.c_str() ,&show_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
         if (!show_window)
         {
             printf("error showing window");
         }
-        ImGui::InputText("File Name", tmp_imgfilename.data(), 100);
-        if (ImGui::Button("Update Image"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+        std::string inputtext = "File Name "+std::to_string(idx);
+        std::string buttext = "Update Image "+std::to_string(idx);
+        std::string combtext = "Mode "+std::to_string(idx);
+        ImGui::InputText(inputtext.c_str(), tmp_imgfilename.data(), 100);
+        if (ImGui::Button(buttext.c_str()))                            // Buttons return true when clicked (most widgets return true when edited/activated)
         {    
             used_imgfilename = tmp_imgfilename;
             imagechanged = true;
@@ -106,8 +106,7 @@ public:
             "8xMSAA",
         };
 
-        ImGui::Combo("Mode", &current, items, IM_ARRAYSIZE(items));
-        ImGui::End();
+        ImGui::Combo(combtext.c_str(), &current, items, IM_ARRAYSIZE(items));
         return imagechanged;
     }
 
