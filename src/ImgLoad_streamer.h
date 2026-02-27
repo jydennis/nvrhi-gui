@@ -20,7 +20,26 @@
 //#include "../bindings/imgui_impl_win32.h"
 #include "../bindings/imgui_impl_glfw.h"
 #include "../bindings/imgui_impl_dx11.h"
+#include <windows.h>
+#include <commdlg.h>
+#include <string>
 
+std::string OpenFileDialog()
+{
+    char filename[MAX_PATH] = "";
+
+    OPENFILENAMEA ofn = {};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.lpstrFile = filename;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.lpstrFilter = "All Files\0*.*\0Text Files\0*.TXT\0";
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+    if (GetOpenFileNameA(&ofn))
+        return filename;
+
+    return "";
+}
 
 class ImgLoader_Streamer {
 public:
@@ -92,11 +111,23 @@ public:
         std::string inputtext = "File Name "+std::to_string(idx);
         std::string buttext = "Update Image "+std::to_string(idx);
         std::string combtext = "Mode "+std::to_string(idx);
+        std::string opentext = "Open File "+std::to_string(idx);
         ImGui::InputText(inputtext.c_str(), tmp_imgfilename.data(), 100);
         if (ImGui::Button(buttext.c_str()))                            // Buttons return true when clicked (most widgets return true when edited/activated)
         {    
             used_imgfilename = tmp_imgfilename;
             imagechanged = true;
+        }
+
+        if (ImGui::Button(opentext.c_str()))
+        {
+            std::string path = OpenFileDialog();
+            if (!path.empty())
+            {
+                tmp_imgfilename = path;
+                used_imgfilename = tmp_imgfilename;
+                imagechanged = true;
+            }
         }
         
         const char* items[] = {
